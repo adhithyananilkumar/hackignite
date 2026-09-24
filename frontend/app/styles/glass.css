@@ -1,0 +1,109 @@
+:root {
+  --glass-bg: rgba(15, 23, 32, 0.55);
+  --glass-bg-strong: rgba(15, 23, 32, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-text: #eaf2f6;
+  --glass-text-dim: #9fb3bd;
+  --risk-normal: #3ddc84;
+  --risk-watch: #f4d35e;
+  --risk-advisory: #f5a623;
+  --risk-high: #f0623a;
+  --risk-critical: #ff3b3b;
+  --accent: #35c2f0;
+}
+
+:root[data-theme="light"] {
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(15, 23, 32, 0.1);
+  --glass-highlight: rgba(15, 23, 32, 0.04);
+  --glass-text: #0f1720;
+  --glass-text-dim: #4a5b64;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 var(--glass-highlight);
+  color: var(--glass-text);
+}
+
+.glass-panel-strong {
+  background: var(--glass-bg-strong);
+}
+
+.glass-button {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  color: var(--glass-text);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.glass-button:hover {
+  transform: translateY(-1px);
+  background: var(--glass-bg);
+}
+
+.risk-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.risk-NORMAL { background: var(--risk-normal); }
+.risk-WATCH { background: var(--risk-watch); }
+.risk-ADVISORY { background: var(--risk-advisory); }
+.risk-HIGH { background: var(--risk-high); }
+.risk-CRITICAL { background: var(--risk-critical); }
+
+.risk-text-NORMAL { color: var(--risk-normal); }
+.risk-text-WATCH { color: var(--risk-watch); }
+.risk-text-ADVISORY { color: var(--risk-advisory); }
+.risk-text-HIGH { color: var(--risk-high); }
+.risk-text-CRITICAL { color: var(--risk-critical); }
+
+.varuna-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.varuna-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 999px;
+}
+
+/* Atmospheric smoke/cloud drift over the command map — purely decorative,
+   pointer-events disabled so it never intercepts clicks on the map/panels. */
+.atmosphere-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  background:
+    radial-gradient(ellipse 55% 38% at 18% 12%, rgba(53, 194, 240, 0.32), transparent 62%),
+    radial-gradient(ellipse 48% 34% at 82% 78%, rgba(150, 100, 255, 0.24), transparent 62%),
+    radial-gradient(ellipse 40% 28% at 68% 8%, rgba(255, 255, 255, 0.1), transparent 60%);
+  filter: blur(50px);
+  animation: varuna-drift 46s ease-in-out infinite alternate;
+}
+
+@keyframes varuna-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-2.5%, 3%) scale(1.06); }
+  100% { transform: translate(3%, -2%) scale(1.03); }
+}
+
+.atmosphere-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 80% 75% at 50% 45%, transparent 55%, rgba(0, 4, 8, 0.65) 100%);
+}

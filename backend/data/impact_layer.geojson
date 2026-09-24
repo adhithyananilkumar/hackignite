@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "note": "Static critical-infrastructure points near the featured basins (Periyar/Idukki, Pamba, Bharathapuzha), hand-sourced approximate positions for demo purposes.",
+  "features": [
+    { "type": "Feature", "properties": { "id": "hosp_aluva", "name": "Aluva Taluk Hospital", "type": "hospital", "basin": "periyar", "capacity_beds": 150 }, "geometry": { "type": "Point", "coordinates": [76.3517, 10.1097] } },
+    { "type": "Feature", "properties": { "id": "hosp_kochi", "name": "Ernakulam General Hospital", "type": "hospital", "basin": "periyar", "capacity_beds": 500 }, "geometry": { "type": "Point", "coordinates": [76.2789, 9.9816] } },
+    { "type": "Feature", "properties": { "id": "school_aluva", "name": "Aluva Govt. HSS", "type": "school", "basin": "periyar", "population": 900 }, "geometry": { "type": "Point", "coordinates": [76.3556, 10.1075] } },
+    { "type": "Feature", "properties": { "id": "shelter_aluva", "name": "Aluva Community Shelter", "type": "shelter", "basin": "periyar", "capacity": 1200 }, "geometry": { "type": "Point", "coordinates": [76.348, 10.112] } },
+    { "type": "Feature", "properties": { "id": "bridge_periyar", "name": "Aluva Periyar Bridge", "type": "bridge", "basin": "periyar" }, "geometry": { "type": "Point", "coordinates": [76.3505, 10.1085] } },
+    { "type": "Feature", "properties": { "id": "hosp_chengannur", "name": "Chengannur Taluk Hospital", "type": "hospital", "basin": "pamba", "capacity_beds": 180 }, "geometry": { "type": "Point", "coordinates": [76.6167, 9.3167] } },
+    { "type": "Feature", "properties": { "id": "hosp_pathanamthitta", "name": "Pathanamthitta General Hospital", "type": "hospital", "basin": "pamba", "capacity_beds": 300 }, "geometry": { "type": "Point", "coordinates": [76.7872, 9.2648] } },
+    { "type": "Feature", "properties": { "id": "shelter_chengannur", "name": "Chengannur Relief Camp", "type": "shelter", "basin": "pamba", "capacity": 900 }, "geometry": { "type": "Point", "coordinates": [76.61, 9.32] } },
+    { "type": "Feature", "properties": { "id": "school_chengannur", "name": "Chengannur Govt. HSS", "type": "school", "basin": "pamba", "population": 700 }, "geometry": { "type": "Point", "coordinates": [76.615, 9.315] } },
+    { "type": "Feature", "properties": { "id": "hosp_shoranur", "name": "Shoranur Taluk Hospital", "type": "hospital", "basin": "bharathapuzha", "capacity_beds": 120 }, "geometry": { "type": "Point", "coordinates": [76.2667, 10.7667] } },
+    { "type": "Feature", "properties": { "id": "hosp_palakkad", "name": "Palakkad District Hospital", "type": "hospital", "basin": "bharathapuzha", "capacity_beds": 400 }, "geometry": { "type": "Point", "coordinates": [76.6548, 10.7867] } },
+    { "type": "Feature", "properties": { "id": "shelter_shoranur", "name": "Shoranur Relief Camp", "type": "shelter", "basin": "bharathapuzha", "capacity": 800 }, "geometry": { "type": "Point", "coordinates": [76.26, 10.77] } },
+    { "type": "Feature", "properties": { "id": "bridge_bharathapuzha", "name": "Shoranur Nila Bridge", "type": "bridge", "basin": "bharathapuzha" }, "geometry": { "type": "Point", "coordinates": [76.264, 10.765] } }
+  ]
+}

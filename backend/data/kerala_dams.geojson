@@ -1,0 +1,46 @@
+{
+  "type": "FeatureCollection",
+  "note": "Coordinates are hand-sourced approximations for a state-scale demo map, not survey-grade positions.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "idukki", "name": "Idukki Dam", "river": "Periyar", "district": "Idukki", "featured": true, "capacity_mcm": 1996, "frl_m": 733.0 },
+      "geometry": { "type": "Point", "coordinates": [76.9767, 9.8447] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "mullaperiyar", "name": "Mullaperiyar Dam", "river": "Periyar", "district": "Idukki", "featured": false, "capacity_mcm": 443, "frl_m": 152.4 },
+      "geometry": { "type": "Point", "coordinates": [77.1355, 9.5236] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "malampuzha", "name": "Malampuzha Dam", "river": "Bharathapuzha", "district": "Palakkad", "featured": false, "capacity_mcm": 265, "frl_m": 115.06 },
+      "geometry": { "type": "Point", "coordinates": [76.6822, 10.8386] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "peechi", "name": "Peechi Dam", "river": "Manali (Karuvannur basin)", "district": "Thrissur", "featured": false, "capacity_mcm": 111, "frl_m": 79.24 },
+      "geometry": { "type": "Point", "coordinates": [76.3467, 10.5314] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "neyyar", "name": "Neyyar Dam", "river": "Neyyar", "district": "Thiruvananthapuram", "featured": false, "capacity_mcm": 106, "frl_m": 143.26 },
+      "geometry": { "type": "Point", "coordinates": [77.1333, 8.5667] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "banasura_sagar", "name": "Banasura Sagar Dam", "river": "Karamanthodu (Kabini basin)", "district": "Wayanad", "featured": false, "capacity_mcm": 226, "frl_m": 775.5 },
+      "geometry": { "type": "Point", "coordinates": [76.0333, 11.6667] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "kundala", "name": "Kundala Dam", "river": "Kundala (Periyar basin)", "district": "Idukki", "featured": false, "capacity_mcm": 10, "frl_m": 1706.0 },
+      "geometry": { "type": "Point", "coordinates": [77.0619, 10.0972] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "walayar", "name": "Walayar Dam", "river": "Walayar (Bharathapuzha basin)", "district": "Palakkad", "featured": false, "capacity_mcm": 24.6, "frl_m": 106.68 },
+      "geometry": { "type": "Point", "coordinates": [76.75, 10.8167] }
+    }
+  ]
+}

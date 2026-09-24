@@ -16,3 +16,6 @@ env/
 # Testing & Cache
 .pytest_cache/
 .coverage
+
+# Raw OpenStreetMap dumps used to build data/*.geojson (see _raw_osm/process.py)
+_raw_osm/*.json
