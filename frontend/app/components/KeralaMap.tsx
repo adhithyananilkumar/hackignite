@@ -59,7 +59,8 @@ const IMPACT_COLORS: Record<string, string> = {
 // Google-Maps-like basemap: CARTO Voyager (key-free) with water recoloured.
 const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 const WATER_COLOR = "#aadaff";
-const OUTSIDE_KERALA = "#eef0f2";
+// Outside Kerala in satellite view: close to the imagery's deep Arabian Sea.
+const SATELLITE_SEA_COLOR = "#0b2b4c";
 const SATELLITE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const TERRAIN_DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 const ROUTE_HIGHLIGHT_COLOR = "#1a73e8";
@@ -173,9 +174,8 @@ function bearingBetween([lon1, lat1]: [number, number], [lon2, lat2]: [number, n
   return (Math.atan2(y, x) * toDeg + 360) % 360;
 }
 
-// A world rectangle with the Kerala outline punched out as a hole. It's drawn
-// beneath the basemap's water, so neighbouring land is washed out while the
-// Arabian Sea stays blue.
+// A world rectangle with the Kerala outline punched out as a hole: painted as
+// sea, it leaves Kerala as the only land on the map.
 function buildMask(keralaOuterRing: [number, number][]) {
   const world: [number, number][] = [
     [-179.9, -85],
@@ -278,6 +278,7 @@ export function KeralaMap({
     map.setLayoutProperty("hillshade", "visibility", satellite ? "none" : "visible");
     map.setPaintProperty("kerala-outline-line", "line-color", satellite ? "#ffffff" : "#5f6368");
     map.setPaintProperty("kerala-outline-casing", "line-opacity", satellite ? 0 : 0.9);
+    map.setPaintProperty("kerala-mask-fill", "fill-color", satellite ? SATELLITE_SEA_COLOR : WATER_COLOR);
 
     const enabled = ASSET_TYPES.filter((t) => layersRef.current[t]);
     const assetFilter = ["in", ["get", "type"], ["literal", enabled]] as unknown as maplibregl.FilterSpecification;
@@ -515,21 +516,18 @@ export function KeralaMap({
     (map.getSource("dams") as maplibregl.GeoJSONSource | undefined)?.setData(damData);
   }
 
-  // Recolour the basemap's water to Google-Maps blue and return the id of the
-  // first water layer, so the outside-Kerala wash can sit beneath it.
-  function styleWater(map: maplibregl.Map): string | undefined {
-    let firstWater: string | undefined;
+  // Recolour the basemap's water to Google-Maps blue (the same colour the
+  // outside-Kerala mask uses, so the two read as one sea).
+  function styleWater(map: maplibregl.Map) {
     for (const layer of map.getStyle().layers ?? []) {
       const id = layer.id.toLowerCase();
       if (!id.includes("water") && !id.includes("ocean")) continue;
       if (layer.type === "fill") {
         map.setPaintProperty(layer.id, "fill-color", WATER_COLOR);
-        firstWater ??= layer.id;
       } else if (layer.type === "line" && !id.includes("label")) {
         map.setPaintProperty(layer.id, "line-color", "#8ec9f5");
       }
     }
-    return firstWater;
   }
 
   // Satellite imagery slots in above land/water fills but below roads and
@@ -579,7 +577,7 @@ export function KeralaMap({
 
       map.on("load", async () => {
         map.resize();
-        const firstWaterLayer = styleWater(map);
+        styleWater(map);
         const satelliteBefore = firstRoadOrLabelLayer(map);
 
         let boundary: any, rivers: any, dams: any, impact: any;
@@ -650,19 +648,8 @@ export function KeralaMap({
           }
         }
 
-        // --- Fade everything outside Kerala; drawn under the water so the sea stays blue ---
         const outerRing = boundary.features[0].geometry.coordinates[0] as [number, number][];
         map.addSource("kerala-mask", { type: "geojson", data: buildMask(outerRing) });
-        map.addLayer(
-          {
-            id: "kerala-mask-fill",
-            type: "fill",
-            source: "kerala-mask",
-            paint: { "fill-color": OUTSIDE_KERALA, "fill-opacity": 0.78 },
-          },
-          firstWaterLayer
-        );
-
         map.addSource("kerala-outline", { type: "geojson", data: boundary });
         map.addLayer({
           id: "kerala-outline-casing",
@@ -897,6 +884,22 @@ export function KeralaMap({
           },
           paint: { "text-color": "#174ea6", "text-halo-color": "#ffffff", "text-halo-width": 1.6 },
         });
+
+        // --- Show only Kerala: everything outside it (neighbouring land, roads,
+        // labels, relief, satellite imagery, and river stretches beyond the
+        // border) is painted over as sea. Only the offshore sea-level markers
+        // and the state outline sit above it. ---
+        map.addLayer(
+          {
+            id: "kerala-mask-fill",
+            type: "fill",
+            source: "kerala-mask",
+            paint: { "fill-color": WATER_COLOR, "fill-opacity": 1, "fill-antialias": false },
+          },
+          "outlets-ring"
+        );
+        map.moveLayer("kerala-outline-casing", "outlets-ring");
+        map.moveLayer("kerala-outline-line", "outlets-ring");
 
         // --- Camera: frame Kerala exactly, then hold it on-state ---
         const { minLng, minLat, maxLng, maxLat } = ringBounds(outerRing);
