@@ -6,7 +6,10 @@ import { MonsoonAtmosphere } from "./components/MonsoonAtmosphere";
 
 export default function Landing() {
   return (
-    <main className="relative flex h-screen w-screen flex-col justify-between overflow-hidden bg-[#050B0F] p-6 sm:p-10 select-none text-[#E8EEF2]">
+    <main 
+      className="relative flex h-screen w-screen flex-col justify-between overflow-hidden bg-[#050B0F] p-6 sm:p-10 select-none text-[#E8EEF2]"
+      style={{ cursor: "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"28\" height=\"28\" viewBox=\"0 0 24 24\" fill=\"%23ffffff\" stroke=\"%233A5260\" stroke-width=\"1.5\"><path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/></svg>') 14 14, auto" }}
+    >
       {/* --- LAYER 1: REALISTIC AERIAL KERALA MONSOON LANDSCAPE --- */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
         <Image
@@ -80,15 +83,6 @@ export default function Landing() {
 
         {/* Minimal system status indicator */}
         <div className="flex items-center gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#071218]/70 px-3 py-1 backdrop-blur-md">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            </span>
-            <span className="text-[10px] font-medium tracking-[0.14em] text-[#C4D5DF]">
-              SYSTEM ONLINE
-            </span>
-          </div>
           <span className="hidden sm:inline font-mono text-[10px] tracking-wider text-[#4E6674]">
             76.2711° E · 10.8505° N
           </span>

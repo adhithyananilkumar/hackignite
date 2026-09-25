@@ -54,16 +54,16 @@ export function MonsoonAtmosphere() {
     window.addEventListener("mousemove", handleMouseMove);
 
     // 1. Natural delicate monsoon raindrops
-    const rainCount = Math.floor(Math.min(width, 1920) / 22);
+    const rainCount = Math.floor(Math.min(width, 1920) / 6);
     const rainDrops: RainDrop[] = [];
     for (let i = 0; i < rainCount; i++) {
       rainDrops.push({
         x: Math.random() * (width + 240) - 120,
         y: Math.random() * height,
-        length: 16 + Math.random() * 20,
-        speed: 6.5 + Math.random() * 5.5,
-        opacity: 0.04 + Math.random() * 0.08, // Very subtle, realistic
-        width: 0.65 + Math.random() * 0.45,
+        length: 25 + Math.random() * 35,
+        speed: 12 + Math.random() * 8,
+        opacity: 0.15 + Math.random() * 0.2, // More visible
+        width: 1.0 + Math.random() * 0.8, // Thicker
       });
     }
 
