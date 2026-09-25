@@ -3,9 +3,9 @@
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatAction, ChatStep } from "../lib/api";
 import type { ChatMessage } from "../lib/useVarunaChat";
-import { LIKELIHOOD_COLORS, SparkleIcon } from "./LocationPanel";
+import { LIKELIHOOD_COLORS, VarunaMark } from "./LocationPanel";
 
-// Just enough Markdown for Gemini's replies: paragraphs, bullets, **bold**, *italic*.
+// Just enough Markdown for the assistant's replies: paragraphs, bullets, **bold**, *italic*.
 // (Underscore italics are skipped so identifiers like GEMINI_API_KEY survive.)
 function inline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).map((part, i) => {
@@ -162,12 +162,12 @@ export function ChatPanel({
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" />
           </svg>
         </button>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1a73e8] to-[#8e44ec] text-white">
-          <SparkleIcon className="h-4 w-4" />
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e8f0fe] text-[#1a73e8]">
+          <VarunaMark className="h-[18px] w-[18px]" />
         </span>
         <div className="ml-1.5 min-w-0 flex-1">
           <div className="text-[15px] font-medium leading-5 text-[#202124]">Ask VARUNA</div>
-          <div className="truncate text-xs text-[#70757a]">Gemini · answers from VARUNA&apos;s live data</div>
+          <div className="truncate text-xs text-[#70757a]">Kerala flood desk · river, rain &amp; flood data</div>
         </div>
         {messages.length > 0 && (
           <button
@@ -186,7 +186,7 @@ export function ChatPanel({
       <div ref={scrollRef} className="varuna-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="px-1">
-            <div className="text-[22px] font-normal leading-7 text-[#202124]">How can I help?</div>
+            <div className="text-[22px] font-normal leading-7 text-[#202124]">Ask about floods in Kerala</div>
             <p className="mt-1 text-sm leading-5 text-[#5f6368]">
               Ask about any river, dam or place in Kerala — I&apos;ll move the map there and answer from the current river,
               rain and flood-model data. Click the map to drop a pin and ask about that spot.

@@ -210,7 +210,7 @@ def _ui_context(ui: dict | None) -> str:
 async def chat(message: str, history: list[dict], ui: dict | None) -> dict:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        return await _offline_chat(message, ui, "*Offline mode — set GEMINI_API_KEY for full answers.*")
+        return await _offline_chat(message, ui, "*Offline mode — showing a data-only answer.*")
 
     contents = [
         {"role": "model" if t["role"] == "assistant" else "user", "parts": [{"text": t["text"]}]}
@@ -239,7 +239,7 @@ async def chat(message: str, history: list[dict], ui: dict | None) -> dict:
                 resp.raise_for_status()
             except httpx.HTTPError as exc:
                 # Still answer from the data, and say why Gemini isn't doing it.
-                return await _offline_chat(message, ui, f"*Gemini unavailable ({_gemini_error(exc)}) — showing a data-only answer.*")
+                return await _offline_chat(message, ui, f"*Assistant unavailable ({_gemini_error(exc)}) — showing a data-only answer.*")
             candidate = (resp.json().get("candidates") or [{}])[0]
             content = candidate.get("content") or {"role": "model", "parts": []}
             parts = content.get("parts", [])

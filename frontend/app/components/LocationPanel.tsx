@@ -151,7 +151,7 @@ export function LocationPanel({
           onClick={() => onAsk(`What's the flood and rain risk at ${title}? What should people there do?`)}
           className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#1a73e8] px-4 py-2 text-sm font-medium text-white hover:bg-[#1765cc]"
         >
-          <SparkleIcon className="h-4 w-4" />
+          <AskIcon className="h-4 w-4" />
           Ask VARUNA about this place
         </button>
       </div>
@@ -226,10 +226,22 @@ export function LocationPanel({
   );
 }
 
-export function SparkleIcon({ className }: { className?: string }) {
+/** Speech bubble, for the "Ask VARUNA" entry points. */
+export function AskIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z" />
+      <path d="M8.5 12h.01M12 12h.01M15.5 12h.01" strokeWidth="2.6" />
+    </svg>
+  );
+}
+
+/** VARUNA's mark: a water drop. */
+export function VarunaMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-      <path d="M12 2.5c.4 3.9 1.4 5.9 3 7.2 1.5 1.2 3.4 1.8 6.5 2.3-3.1.5-5 1.1-6.5 2.3-1.6 1.3-2.6 3.3-3 7.2-.4-3.9-1.4-5.9-3-7.2-1.5-1.2-3.4-1.8-6.5-2.3 3.1-.5 5-1.1 6.5-2.3 1.6-1.3 2.6-3.3 3-7.2z" />
+      <path d="M12 2.7s-6.5 7.2-6.5 11.8a6.5 6.5 0 0 0 13 0C18.5 9.9 12 2.7 12 2.7z" />
+      <path d="M8.6 14.6c.2 1.7 1.5 3 3.2 3.2" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity=".75" />
     </svg>
   );
 }

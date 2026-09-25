@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { SparkleIcon } from "./LocationPanel";
+import { AskIcon } from "./LocationPanel";
 
 export type SearchResult =
   | { kind: "river" | "dam"; id: string; name: string; detail: string }
@@ -244,7 +244,7 @@ export function SearchBox({
             chatOpen ? "bg-[#1a73e8] text-white" : "text-[#1a73e8] hover:bg-[#e8f0fe]"
           }`}
         >
-          <SparkleIcon className="h-4 w-4" />
+          <AskIcon className="h-4 w-4" />
           Ask VARUNA
         </button>
       </div>

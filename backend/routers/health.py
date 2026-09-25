@@ -27,6 +27,6 @@ def data_health():
             "detail": f"{len(flood_model.manifest.get('rivers', {}))} rivers · {MODEL_LABEL}",
             "as_of": flood_model.manifest.get("built_at", now),
         },
-        {"name": "Ask VARUNA (Gemini)", "status": "LIVE" if os.environ.get("GEMINI_API_KEY") else "OFFLINE", "detail": "Set GEMINI_API_KEY to enable", "as_of": now},
+        {"name": "Ask VARUNA assistant", "status": "LIVE" if os.environ.get("GEMINI_API_KEY") else "OFFLINE", "detail": "Set GEMINI_API_KEY to enable", "as_of": now},
     ]
     return {"mode": hub.mode, "sources": sources}

@@ -59,8 +59,41 @@ const IMPACT_COLORS: Record<string, string> = {
 // Google-Maps-like basemap: CARTO Voyager (key-free) with water recoloured.
 const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 const WATER_COLOR = "#aadaff";
-// Outside Kerala in satellite view: close to the imagery's deep Arabian Sea.
-const SATELLITE_SEA_COLOR = "#0b2b4c";
+// The sea around Kerala is a generated texture per basemap: a deep teal ocean
+// under satellite imagery, a light Google-blue sea under the map style. The
+// coast gets a lighter "shallow water" glow on top.
+type Rgb = [number, number, number];
+const SEA_THEMES: Record<Basemap, { deep: Rgb; crest: Rgb; shallow: string; shallowEdge: string }> = {
+  satellite: { deep: [9, 52, 82], crest: [28, 104, 138], shallow: "#2fa6b8", shallowEdge: "#8fe3e6" },
+  map: { deep: [160, 211, 250], crest: [196, 230, 255], shallow: "#7cc7f4", shallowEdge: "#d6efff" },
+};
+const SEA_TEXTURE_PX = 256;
+// Integer frequencies keep the texture seamless when it tiles.
+const SEA_WAVES: [fx: number, fy: number, amplitude: number, phase: number][] = [
+  [1, 2, 1, 0.3],
+  [3, -1, 0.7, 1.9],
+  [-2, 5, 0.5, 4.1],
+  [6, 3, 0.3, 2.6],
+  [-7, 9, 0.18, 5.2],
+];
+
+function seaTexture(deep: Rgb, crest: Rgb) {
+  const size = SEA_TEXTURE_PX;
+  const data = new Uint8Array(size * size * 4);
+  const norm = SEA_WAVES.reduce((sum, [, , a]) => sum + a, 0);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let v = 0;
+      for (const [fx, fy, a, phase] of SEA_WAVES) v += a * Math.sin((2 * Math.PI * (fx * x + fy * y)) / size + phase);
+      // 0..1, sharpened so light "crests" are sparse, plus a little grain.
+      const t = Math.min(1, Math.max(0, ((v / norm + 1) / 2) ** 2.2 + (Math.random() - 0.5) * 0.04));
+      const i = (y * size + x) * 4;
+      for (let c = 0; c < 3; c++) data[i + c] = Math.round(deep[c] + (crest[c] - deep[c]) * t);
+      data[i + 3] = 255;
+    }
+  }
+  return { width: size, height: size, data };
+}
 const SATELLITE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const TERRAIN_DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 const ROUTE_HIGHLIGHT_COLOR = "#1a73e8";
@@ -201,7 +234,7 @@ export function KeralaMap({
   horizonIndex = 0,
   focus = null,
   coastal = null,
-  basemap = "map",
+  basemap = "satellite",
   layers = DEFAULT_LAYERS,
   padding = { top: 80, bottom: 160, left: 60, right: 60 },
   pin = null,
@@ -278,7 +311,10 @@ export function KeralaMap({
     map.setLayoutProperty("hillshade", "visibility", satellite ? "none" : "visible");
     map.setPaintProperty("kerala-outline-line", "line-color", satellite ? "#ffffff" : "#5f6368");
     map.setPaintProperty("kerala-outline-casing", "line-opacity", satellite ? 0 : 0.9);
-    map.setPaintProperty("kerala-mask-fill", "fill-color", satellite ? SATELLITE_SEA_COLOR : WATER_COLOR);
+    const sea = SEA_THEMES[basemapRef.current];
+    map.setPaintProperty("kerala-mask-fill", "fill-pattern", `sea-${basemapRef.current}`);
+    map.setPaintProperty("kerala-shallows", "line-color", sea.shallow);
+    map.setPaintProperty("kerala-shallows-edge", "line-color", sea.shallowEdge);
 
     const enabled = ASSET_TYPES.filter((t) => layersRef.current[t]);
     const assetFilter = ["in", ["get", "type"], ["literal", enabled]] as unknown as maplibregl.FilterSpecification;
@@ -889,12 +925,47 @@ export function KeralaMap({
         // labels, relief, satellite imagery, and river stretches beyond the
         // border) is painted over as sea. Only the offshore sea-level markers
         // and the state outline sit above it. ---
+        for (const [name, theme] of Object.entries(SEA_THEMES)) {
+          map.addImage(`sea-${name}`, seaTexture(theme.deep, theme.crest));
+        }
+        const sea = SEA_THEMES[basemapRef.current];
         map.addLayer(
           {
             id: "kerala-mask-fill",
             type: "fill",
             source: "kerala-mask",
-            paint: { "fill-color": WATER_COLOR, "fill-opacity": 1, "fill-antialias": false },
+            paint: { "fill-pattern": `sea-${basemapRef.current}`, "fill-antialias": false },
+          },
+          "outlets-ring"
+        );
+        // Shallow water hugging the coast: a wide soft glow and a tighter bright edge.
+        map.addLayer(
+          {
+            id: "kerala-shallows",
+            type: "line",
+            source: "kerala-outline",
+            layout: { "line-join": "round" },
+            paint: {
+              "line-color": sea.shallow,
+              "line-width": ["interpolate", ["linear"], ["zoom"], 6, 18, 10, 40, 14, 90],
+              "line-blur": ["interpolate", ["linear"], ["zoom"], 6, 14, 10, 32, 14, 70],
+              "line-opacity": 0.45,
+            },
+          },
+          "outlets-ring"
+        );
+        map.addLayer(
+          {
+            id: "kerala-shallows-edge",
+            type: "line",
+            source: "kerala-outline",
+            layout: { "line-join": "round" },
+            paint: {
+              "line-color": sea.shallowEdge,
+              "line-width": ["interpolate", ["linear"], ["zoom"], 6, 3, 10, 7, 14, 14],
+              "line-blur": ["interpolate", ["linear"], ["zoom"], 6, 2, 10, 5, 14, 10],
+              "line-opacity": 0.55,
+            },
           },
           "outlets-ring"
         );
