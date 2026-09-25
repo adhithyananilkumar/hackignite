@@ -190,7 +190,7 @@ class SimulationProvider(StateProvider):
                 rule_level_status="APPROACHING" if risk.value in ("HIGH", "CRITICAL") else "NORMAL",
                 risk=risk,
                 updated_at=now_iso(),
-                source="simulation",
+                source="simulation" if self.has_dam_profile(dam_id) else "static",
             )
 
     # ---- reads ----

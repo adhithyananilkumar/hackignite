@@ -8,7 +8,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 load_dotenv()
 
-from routers import ai, alerts, boundary, dams, flood, forecast, health, hydrology, impact, rivers, sources, weather, ws
+from routers import ai, alerts, boundary, chat, dams, flood, forecast, health, hydrology, impact, locate, rivers, sources, weather, ws
 from services.sources.hub import hub
 
 
@@ -39,6 +39,8 @@ app.include_router(flood.router)
 app.include_router(impact.router)
 app.include_router(alerts.router)
 app.include_router(ai.router)
+app.include_router(chat.router)
+app.include_router(locate.router)
 app.include_router(health.router)
 app.include_router(sources.router)
 app.include_router(hydrology.router)

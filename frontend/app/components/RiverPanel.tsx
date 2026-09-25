@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type ExposedAsset, type RiverFloodForecast, type RiverReading } from "../lib/api";
+import { api, type ExposedAsset, type FlowOutlook, type RiverFloodForecast, type RiverReading } from "../lib/api";
 import { horizonLabel } from "./FloodTimeline";
 import { ImpactPanel } from "./ImpactPanel";
+import { MiniChart } from "./MiniChart";
 import { PanelHeader, Section } from "./PanelParts";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -17,6 +18,47 @@ function Stat({ value, label }: { value: string; label: string }) {
     <div className="rounded-lg bg-white/55 px-3 py-2">
       <div className="text-base font-medium tabular-nums text-[#202124]">{value}</div>
       <div className="text-xs text-[#5f6368]">{label}</div>
+    </div>
+  );
+}
+
+function FlowChart({ flow }: { flow: FlowOutlook }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const days = flow.days.filter((d) => d.median != null);
+  const x = (i: number) => i;
+  const nowIdx = Math.max(0, days.findIndex((d) => d.date === today));
+  const peak = days.slice(nowIdx).reduce((m, d) => Math.max(m, d.max ?? 0), 0);
+  const refs = [
+    ...(flow.warning_flow_m3s ? [{ y: flow.warning_flow_m3s, color: "#f9ab00", label: "Warning flow" }] : []),
+    ...(flow.danger_flow_m3s ? [{ y: flow.danger_flow_m3s, color: "#c5221f", label: "Danger flow" }] : []),
+  ];
+  // Only draw threshold lines when the forecast gets near them, or they flatten the chart.
+  const visibleRefs = refs.filter((r) => r.y <= peak * 1.6);
+  return (
+    <div>
+      <MiniChart
+        height={70}
+        bands={[
+          { upper: days.map((d, i) => [x(i), d.max!]), lower: days.map((d, i) => [x(i), d.min!]), color: "#1a73e8", opacity: 0.1 },
+          { upper: days.map((d, i) => [x(i), d.p75!]), lower: days.map((d, i) => [x(i), d.p25!]), color: "#1a73e8", opacity: 0.22 },
+        ]}
+        lines={[{ points: days.map((d, i) => [x(i), d.median!]), color: "#1a73e8" }]}
+        refs={visibleRefs}
+        nowX={nowIdx}
+        xLabels={[
+          { x: 0, label: new Date(days[0].date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) },
+          { x: days.length - 1, label: new Date(days[days.length - 1].date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) },
+        ]}
+      />
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <Stat value={`${Math.round(days[nowIdx]?.median ?? 0).toLocaleString()} m³/s`} label="Today (median)" />
+        <Stat value={`${Math.round(peak).toLocaleString()} m³/s`} label="7-day worst case" />
+        <Stat value={flow.warning_flow_m3s ? `${Math.round(flow.warning_flow_m3s).toLocaleString()} m³/s` : "—"} label="Warning flow (2-yr)" />
+      </div>
+      <div className="mt-1.5 text-[11px] text-[#70757a]">
+        Median with interquartile and min–max ensemble range · {flow.source}
+        {!flow.warning_flow_m3s && " · thresholds appear once this gauge is calibrated in Live mode"}
+      </div>
     </div>
   );
 }
@@ -43,6 +85,8 @@ export function RiverPanel({
   onClose: () => void;
 }) {
   const [dangerCrossing, setDangerCrossing] = useState<number | null>(null);
+  const [flow, setFlow] = useState<FlowOutlook | null>(null);
+  const [flowError, setFlowError] = useState(false);
 
   useEffect(() => {
     api
@@ -50,6 +94,15 @@ export function RiverPanel({
       .then((f) => setDangerCrossing(f.danger_crossing_hours))
       .catch(() => setDangerCrossing(null));
   }, [riverId, reading?.risk]);
+
+  useEffect(() => {
+    setFlow(null);
+    setFlowError(false);
+    api
+      .riverFlow(riverId)
+      .then(setFlow)
+      .catch(() => setFlowError(true));
+  }, [riverId]);
 
   if (!reading) return null;
 
@@ -99,6 +152,10 @@ export function RiverPanel({
             </>
           )}
         </div>
+      </Section>
+
+      <Section title="Flow outlook · 7 days">
+        {flow ? <FlowChart flow={flow} /> : <div className="text-xs text-[#5f6368]">{flowError ? "Flow outlook unavailable right now." : "Loading GloFAS outlook…"}</div>}
       </Section>
 
       {flood ? (

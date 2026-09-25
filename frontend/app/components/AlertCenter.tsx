@@ -35,7 +35,7 @@ export function AlertCenter({
         <span className="text-[15px] font-medium text-[#202124]">Alerts</span>
         <span className="text-xs text-[#70757a]">{open ? `${open} need attention` : "All clear"}</span>
       </div>
-      <div className="max-h-[32vh] overflow-y-auto varuna-scrollbar pb-2">
+      <div className="max-h-[22vh] overflow-y-auto varuna-scrollbar pb-2">
         {alerts.length === 0 && <div className="px-4 pb-2 text-sm text-[#5f6368]">No active alerts. All basins are normal.</div>}
         {alerts.map((alert) => (
           <div

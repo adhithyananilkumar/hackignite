@@ -2,7 +2,7 @@
 
 import type * as maplibregl from "maplibre-gl";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { API_BASE, api, type FloodForecast } from "../lib/api";
+import { API_BASE, api, type CoastalSnapshot, type FloodForecast } from "../lib/api";
 import type { LiveSnapshot } from "../lib/useLiveData";
 
 // maplibre-gl is loaded from a CDN <script>, injected manually below, instead
@@ -110,6 +110,30 @@ function exposedCollection(flood: FloodForecast | null, horizonIndex: number) {
   return { type: "FeatureCollection" as const, features };
 }
 
+const DRAINAGE_COLORS: Record<string, string> = {
+  FREE_DRAINING: "#1e8e3e",
+  TIDAL_CONSTRAINT: "#f9ab00",
+  BACKWATER_RISK: "#d93025",
+};
+
+function outletCollection(coastal: CoastalSnapshot | null) {
+  return {
+    type: "FeatureCollection" as const,
+    features: (coastal?.outlets ?? []).map((o) => ({
+      type: "Feature" as const,
+      properties: {
+        id: o.id,
+        name: o.name,
+        drainage: o.drainage,
+        color: DRAINAGE_COLORS[o.drainage],
+        label: `${o.name.split(" (")[0]} ${o.level_m >= 0 ? "+" : ""}${o.level_m.toFixed(2)} m`,
+        level_m: o.level_m,
+      },
+      geometry: { type: "Point" as const, coordinates: o.coordinates },
+    })),
+  };
+}
+
 function ringBounds(ring: [number, number][]) {
   let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
   for (const [lng, lat] of ring) {
@@ -165,6 +189,7 @@ export function KeralaMap({
   flood = null,
   horizonIndex = 0,
   focus = null,
+  coastal = null,
   basemap = "map",
   layers = DEFAULT_LAYERS,
   padding = { top: 80, bottom: 160, left: 60, right: 60 },
@@ -177,6 +202,7 @@ export function KeralaMap({
   flood?: FloodForecast | null;
   horizonIndex?: number;
   focus?: MapFocus;
+  coastal?: CoastalSnapshot | null;
   basemap?: Basemap;
   layers?: LayerToggles;
   /** Screen space covered by floating UI, kept clear when framing Kerala or a river. */
@@ -203,6 +229,12 @@ export function KeralaMap({
   const floodUrlsRef = useRef<Record<string, string>>({});
   const mapReadyRef = useRef(false);
   const paddingRef = useRef(padding);
+  const coastalRef = useRef<CoastalSnapshot | null>(coastal);
+
+  useEffect(() => {
+    coastalRef.current = coastal;
+    (mapRef.current?.getSource("outlets") as maplibregl.GeoJSONSource | undefined)?.setData(outletCollection(coastal));
+  }, [coastal]);
   const basemapRef = useRef<Basemap>(basemap);
   const layersRef = useRef<LayerToggles>(layers);
 
@@ -771,6 +803,47 @@ export function KeralaMap({
           },
         });
 
+        // --- Sea level at river mouths (offshore, in the Arabian Sea) ---
+        map.addSource("outlets", { type: "geojson", data: outletCollection(coastalRef.current) });
+        map.addLayer({
+          id: "outlets-ring",
+          type: "circle",
+          source: "outlets",
+          paint: {
+            "circle-radius": 11,
+            "circle-color": ["get", "color"],
+            "circle-opacity": 0.18,
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": ["get", "color"],
+            "circle-pitch-alignment": "map",
+          },
+        });
+        map.addLayer({
+          id: "outlets-circle",
+          type: "circle",
+          source: "outlets",
+          paint: {
+            "circle-radius": 5,
+            "circle-color": ["get", "color"],
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+        map.addLayer({
+          id: "outlets-label",
+          type: "symbol",
+          source: "outlets",
+          layout: {
+            "text-field": ["get", "label"],
+            "text-size": 11,
+            "text-anchor": "right",
+            "text-offset": [-1.4, 0],
+            "text-font": ["Noto Sans Regular"],
+            "text-optional": true,
+          },
+          paint: { "text-color": "#174ea6", "text-halo-color": "#ffffff", "text-halo-width": 1.6 },
+        });
+
         // --- Camera: frame Kerala exactly, then hold it on-state ---
         const { minLng, minLat, maxLng, maxLat } = ringBounds(outerRing);
         map.fitBounds(
@@ -801,7 +874,8 @@ export function KeralaMap({
         const ASSET_TOLERANCE = 5;
         type Hit =
           | { kind: "dam" | "river"; id: string; name: string }
-          | { kind: "asset"; name: string; type: string; depth: number | null; lngLat: [number, number] };
+          | { kind: "asset"; name: string; type: string; depth: number | null; lngLat: [number, number] }
+          | { kind: "outlet"; name: string; detail: string; lngLat: [number, number] };
         const around = (x: number, y: number, r: number): [[number, number], [number, number]] => [
           [x - r, y - r],
           [x + r, y + r],
@@ -809,6 +883,17 @@ export function KeralaMap({
         const pick = ({ x, y }: { x: number; y: number }): Hit | null => {
           const dam = map.queryRenderedFeatures([x, y], { layers: ["dams-hit"] })[0];
           if (dam) return { kind: "dam", id: dam.properties?.id, name: dam.properties?.name };
+          const outlet = map.queryRenderedFeatures(around(x, y, TOLERANCE), { layers: ["outlets-ring", "outlets-circle"] })[0];
+          if (outlet) {
+            const p = outlet.properties ?? {};
+            const drainage = String(p.drainage).replace("_", " ").toLowerCase();
+            return {
+              kind: "outlet",
+              name: p.name,
+              detail: `${Number(p.level_m) >= 0 ? "+" : ""}${Number(p.level_m).toFixed(2)} m · ${drainage}`,
+              lngLat: (outlet.geometry as GeoJSON.Point).coordinates as [number, number],
+            };
+          }
           const asset =
             map.queryRenderedFeatures(around(x, y, ASSET_TOLERANCE), { layers: ["exposed-points"] })[0] ??
             map.queryRenderedFeatures(around(x, y, ASSET_TOLERANCE), { layers: ["impact-points"] })[0];
@@ -827,6 +912,7 @@ export function KeralaMap({
         };
 
         const describe = (hit: Hit): Omit<HoverInfo, "x" | "y"> => {
+          if (hit.kind === "outlet") return { label: "Sea level", name: hit.name, detail: hit.detail };
           if (hit.kind !== "asset") {
             return { label: hit.kind === "dam" ? "Dam" : "River", name: hit.name, detail: "Click to fly in" };
           }
@@ -870,6 +956,8 @@ export function KeralaMap({
           if (!hit) return onDeselectRef.current?.();
           if (hit.kind === "asset") {
             map.flyTo({ center: hit.lngLat, zoom: Math.max(map.getZoom(), 14), pitch: 62, duration: 1200, essential: true });
+          } else if (hit.kind === "outlet") {
+            map.flyTo({ center: hit.lngLat, zoom: Math.max(map.getZoom(), 10.5), duration: 1200, essential: true });
           } else if (hit.kind === "dam") onSelectDamRef.current?.(hit.id);
           else onSelectRiverRef.current?.(hit.id);
         });
