@@ -1,7 +1,7 @@
 "use client";
 
 import type * as maplibregl from "maplibre-gl";
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { LiveSnapshot } from "../lib/useLiveData";
 
@@ -55,6 +55,9 @@ const IMPACT_COLORS: Record<string, string> = {
 
 const DEEP_WATER = "#03060b";
 const TERRAIN_DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+const ROUTE_HIGHLIGHT_COLOR = "#9fe9ff";
+
+export type MapSelection = { type: "river" | "dam"; id: string } | null;
 
 function ringBounds(ring: [number, number][]) {
   let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
@@ -65,6 +68,23 @@ function ringBounds(ring: [number, number][]) {
     if (lat > maxLat) maxLat = lat;
   }
   return { minLng, minLat, maxLng, maxLat };
+}
+
+// Rivers are stored as LineString or MultiLineString; flatten either into one
+// coordinate list so bounds/bearing math doesn't need to care which.
+function flattenLineCoords(geometry: any): [number, number][] {
+  if (geometry?.type === "LineString") return geometry.coordinates;
+  if (geometry?.type === "MultiLineString") return geometry.coordinates.flat();
+  return [];
+}
+
+function bearingBetween([lon1, lat1]: [number, number], [lon2, lat2]: [number, number]) {
+  const toRad = Math.PI / 180, toDeg = 180 / Math.PI;
+  const y = Math.sin((lon2 - lon1) * toRad) * Math.cos(lat2 * toRad);
+  const x =
+    Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) -
+    Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos((lon2 - lon1) * toRad);
+  return (Math.atan2(y, x) * toDeg + 360) % 360;
 }
 
 // A world rectangle with the Kerala outline punched out as a hole: filled in
@@ -89,24 +109,148 @@ function buildMask(keralaOuterRing: [number, number][]) {
 
 export function KeralaMap({
   snapshot,
+  selection = null,
   onSelectRiver,
   onSelectDam,
+  onDeselect,
 }: {
   snapshot: LiveSnapshot | null;
+  selection?: MapSelection;
   onSelectRiver?: (id: string) => void;
   onSelectDam?: (id: string) => void;
+  onDeselect?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const riversRef = useRef<any>(null);
   const damsRef = useRef<any>(null);
   const snapshotRef = useRef<LiveSnapshot | null>(snapshot);
+  const overviewRef = useRef<{ center: [number, number]; zoom: number; pitch: number; bearing: number } | null>(null);
+  const onDeselectRef = useRef<(() => void) | undefined>(onDeselect);
+  const onSelectRiverRef = useRef(onSelectRiver);
+  const onSelectDamRef = useRef(onSelectDam);
+  const hoverIdRef = useRef<string | null>(null);
+  const [bearing, setBearing] = useState(0);
+  const [pitch, setPitch] = useState(52);
+  const [hover, setHover] = useState<{ x: number; y: number; name: string; kind: "River" | "Dam" } | null>(
+    null
+  );
+
+  useEffect(() => {
+    onSelectRiverRef.current = onSelectRiver;
+    onSelectDamRef.current = onSelectDam;
+  }, [onSelectRiver, onSelectDam]);
+
+  useEffect(() => {
+    onDeselectRef.current = onDeselect;
+  }, [onDeselect]);
 
   useEffect(() => {
     snapshotRef.current = snapshot;
     applySnapshotColors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot]);
+
+  // --- Fly the camera to the selected river/dam and highlight its route,
+  // like a Google Maps route pop while everything else fades back. ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !riversRef.current || !damsRef.current) return;
+
+    if (!selection) {
+      resetHighlight(map);
+      const overview = overviewRef.current;
+      if (overview) {
+        map.flyTo({ ...overview, duration: 1600, essential: true });
+      }
+      return;
+    }
+
+    if (selection.type === "river") {
+      const feature = riversRef.current.features.find((f: any) => f.properties?.id === selection.id);
+      const coords = flattenLineCoords(feature?.geometry);
+      if (!coords.length) return;
+      highlightRiver(map, selection.id);
+      const { minLng, minLat, maxLng, maxLat } = ringBounds(coords);
+      const bearing = bearingBetween(coords[0], coords[coords.length - 1]);
+      map.fitBounds(
+        [
+          [minLng, minLat],
+          [maxLng, maxLat],
+        ],
+        {
+          padding: { top: 140, bottom: 180, left: 320, right: 340 },
+          pitch: 66,
+          bearing,
+          duration: 1800,
+          maxZoom: 12.2,
+          essential: true,
+        }
+      );
+    } else {
+      const feature = damsRef.current.features.find((f: any) => f.properties?.id === selection.id);
+      if (!feature) return;
+      const [lng, lat] = feature.geometry.coordinates as [number, number];
+      highlightDam(map, selection.id);
+      map.flyTo({
+        center: [lng, lat],
+        zoom: 13.4,
+        pitch: 72,
+        bearing: -18,
+        duration: 1800,
+        essential: true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection]);
+
+  function highlightRiver(map: maplibregl.Map, id: string) {
+    const isSelected = ["==", ["get", "id"], id];
+    map.setPaintProperty("rivers-line", "line-opacity", ["case", isSelected, 1, 0.12]);
+    map.setPaintProperty("rivers-line", "line-width", ["case", isSelected, 4.4, 2]);
+    map.setPaintProperty("rivers-glow", "line-color", [
+      "case",
+      isSelected,
+      ROUTE_HIGHLIGHT_COLOR,
+      ["coalesce", ["get", "color"], "#35c2f0"],
+    ]);
+    map.setPaintProperty("rivers-glow", "line-opacity", ["case", isSelected, 0.85, 0.05]);
+    map.setPaintProperty("rivers-glow", "line-width", ["case", isSelected, 17, 9]);
+    map.setPaintProperty("dams-circle", "circle-opacity", 0.3);
+    map.setPaintProperty("dams-glow", "circle-opacity", 0.1);
+    map.setPaintProperty("dams-label", "text-opacity", 0.3);
+  }
+
+  function highlightDam(map: maplibregl.Map, id: string) {
+    const isSelected = ["==", ["get", "id"], id];
+    map.setPaintProperty("dams-circle", "circle-opacity", ["case", isSelected, 1, 0.25]);
+    map.setPaintProperty("dams-circle", "circle-radius", ["case", isSelected, 9, 6]);
+    map.setPaintProperty("dams-glow", "circle-color", [
+      "case",
+      isSelected,
+      ROUTE_HIGHLIGHT_COLOR,
+      ["coalesce", ["get", "color"], "#35c2f0"],
+    ]);
+    map.setPaintProperty("dams-glow", "circle-opacity", ["case", isSelected, 0.6, 0.08]);
+    map.setPaintProperty("dams-glow", "circle-radius", ["case", isSelected, 24, 14]);
+    map.setPaintProperty("dams-label", "text-opacity", ["case", isSelected, 1, 0.3]);
+    map.setPaintProperty("rivers-line", "line-opacity", 0.3);
+    map.setPaintProperty("rivers-glow", "line-opacity", 0.08);
+  }
+
+  function resetHighlight(map: maplibregl.Map) {
+    map.setPaintProperty("rivers-line", "line-opacity", 0.95);
+    map.setPaintProperty("rivers-line", "line-width", 2.6);
+    map.setPaintProperty("rivers-glow", "line-color", ["coalesce", ["get", "color"], "#35c2f0"]);
+    map.setPaintProperty("rivers-glow", "line-opacity", 0.45);
+    map.setPaintProperty("rivers-glow", "line-width", 9);
+    map.setPaintProperty("dams-circle", "circle-opacity", 1);
+    map.setPaintProperty("dams-circle", "circle-radius", 6);
+    map.setPaintProperty("dams-glow", "circle-color", ["coalesce", ["get", "color"], "#35c2f0"]);
+    map.setPaintProperty("dams-glow", "circle-opacity", 0.35);
+    map.setPaintProperty("dams-glow", "circle-radius", 14);
+    map.setPaintProperty("dams-label", "text-opacity", 1);
+  }
 
   function applySnapshotColors() {
     const map = mapRef.current;
@@ -170,7 +314,13 @@ export function KeralaMap({
         antialias: true,
       });
       mapRef.current = map;
-      map.addControl(new gl.NavigationControl({ visualizePitch: true }), "top-right");
+      // Google-Maps-style gestures: left-drag pans, right-drag (or ctrl+drag)
+      // rotates and tilts, wheel zooms toward the cursor, double-click zooms in.
+      map.dragRotate.enable();
+      map.touchZoomRotate.enableRotation();
+      map.keyboard.enable();
+      map.on("rotate", () => setBearing(map.getBearing()));
+      map.on("pitch", () => setPitch(map.getPitch()));
 
       resizeObserver = new ResizeObserver(() => map.resize());
       resizeObserver.observe(containerRef.current);
@@ -302,6 +452,28 @@ export function KeralaMap({
             "line-opacity": 0.95,
           },
         });
+        map.addLayer({
+          id: "rivers-hover",
+          type: "line",
+          source: "rivers",
+          filter: ["==", ["get", "id"], ""],
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": ROUTE_HIGHLIGHT_COLOR,
+            "line-width": 7,
+            "line-blur": 2,
+            "line-opacity": 0.55,
+          },
+        });
+        // Near-invisible wide stroke: the visible river is ~2.6px, far too thin
+        // to hit reliably, so clicks/hover are tested against this instead.
+        map.addLayer({
+          id: "rivers-hit",
+          type: "line",
+          source: "rivers",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#000", "line-width": 34, "line-opacity": 0.01 },
+        });
 
         // --- Dams ---
         map.addSource("dams", { type: "geojson", data: damsRef.current });
@@ -326,6 +498,12 @@ export function KeralaMap({
             "circle-stroke-width": 2,
             "circle-stroke-color": "#04070c",
           },
+        });
+        map.addLayer({
+          id: "dams-hit",
+          type: "circle",
+          source: "dams",
+          paint: { "circle-radius": 18, "circle-color": "#000", "circle-opacity": 0.01 },
         });
         map.addLayer({
           id: "dams-label",
@@ -359,22 +537,61 @@ export function KeralaMap({
           [minLng - pad, minLat - pad],
           [maxLng + pad, maxLat + pad],
         ]);
+        const center = map.getCenter();
+        overviewRef.current = {
+          center: [center.lng, center.lat],
+          zoom: map.getZoom(),
+          pitch: map.getPitch(),
+          bearing: map.getBearing(),
+        };
+        setBearing(map.getBearing());
+        setPitch(map.getPitch());
 
-        const cursorPointer = () => (map.getCanvas().style.cursor = "pointer");
-        const cursorDefault = () => (map.getCanvas().style.cursor = "");
+        // Dams sit on top of rivers, so they win when both are under the cursor.
+        const TOLERANCE = 8;
+        const pick = ({ x, y }: { x: number; y: number }) => {
+          const dam = map.queryRenderedFeatures([x, y], { layers: ["dams-hit"] })[0];
+          if (dam) return { kind: "Dam" as const, id: dam.properties?.id as string, name: dam.properties?.name as string };
+          const box: [[number, number], [number, number]] = [
+            [x - TOLERANCE, y - TOLERANCE],
+            [x + TOLERANCE, y + TOLERANCE],
+          ];
+          const river = map.queryRenderedFeatures(box, { layers: ["rivers-hit"] })[0];
+          if (river) return { kind: "River" as const, id: river.properties?.id as string, name: river.properties?.name as string };
+          return null;
+        };
 
-        map.on("click", "rivers-line", (e: maplibregl.MapLayerMouseEvent) => {
-          const id = e.features?.[0]?.properties?.id;
-          if (id) onSelectRiver?.(id);
+        const setRiverHover = (id: string | null) => {
+          if (hoverIdRef.current === id) return;
+          hoverIdRef.current = id;
+          map.setFilter("rivers-hover", ["==", ["get", "id"], id ?? ""]);
+        };
+
+        const clearHover = () => {
+          map.getCanvas().style.cursor = "";
+          setRiverHover(null);
+          setHover(null);
+        };
+
+        // Pointer only over something clickable; everywhere else MapLibre's own
+        // grab/grabbing hand shows, so it's clear where dragging pans the map.
+        map.on("mousemove", (e: maplibregl.MapMouseEvent) => {
+          if (map.isMoving()) return;
+          const hit = pick(e.point);
+          if (!hit) return clearHover();
+          map.getCanvas().style.cursor = "pointer";
+          setRiverHover(hit.kind === "River" ? hit.id : null);
+          setHover({ x: e.point.x, y: e.point.y, name: hit.name, kind: hit.kind });
         });
-        map.on("click", "dams-circle", (e: maplibregl.MapLayerMouseEvent) => {
-          const id = e.features?.[0]?.properties?.id;
-          if (id) onSelectDam?.(id);
+        map.on("mouseout", clearHover);
+        map.on("movestart", clearHover);
+
+        map.on("click", (e: maplibregl.MapMouseEvent) => {
+          const hit = pick(e.point);
+          if (!hit) return onDeselectRef.current?.();
+          if (hit.kind === "Dam") onSelectDamRef.current?.(hit.id);
+          else onSelectRiverRef.current?.(hit.id);
         });
-        for (const layer of ["rivers-line", "dams-circle", "impact-points"]) {
-          map.on("mouseenter", layer, cursorPointer);
-          map.on("mouseleave", layer, cursorDefault);
-        }
 
         applySnapshotColors();
       });
@@ -402,9 +619,78 @@ export function KeralaMap({
   // utility class on the same node and collapsed it to zero height, so the map
   // container is a plain div sized with inline styles (which win on specificity)
   // inside a Tailwind-positioned wrapper.
+  const is3D = pitch > 5;
+  const zoomBy = (delta: number) => mapRef.current?.easeTo({ zoom: mapRef.current.getZoom() + delta, duration: 300 });
+  const resetNorth = () => mapRef.current?.easeTo({ bearing: 0, duration: 500 });
+  const toggle3D = () => mapRef.current?.easeTo({ pitch: is3D ? 0 : 60, duration: 600 });
+  const resetView = () => {
+    const overview = overviewRef.current;
+    if (overview) mapRef.current?.flyTo({ ...overview, duration: 1400, essential: true });
+    onDeselect?.();
+  };
+
   return (
     <div className="absolute inset-0">
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+
+      {hover && (
+        <div
+          className="pointer-events-none absolute z-20 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] px-2.5 py-1.5 text-xs text-[var(--glass-text)] shadow-lg backdrop-blur-md"
+          style={{ left: hover.x + 14, top: hover.y + 14 }}
+        >
+          <span className="mr-1.5 text-[10px] uppercase tracking-wider text-[var(--glass-text-dim)]">{hover.kind}</span>
+          <span className="font-semibold">{hover.name}</span>
+          <div className="mt-0.5 text-[10px] text-[var(--glass-text-dim)]">Click to fly in</div>
+        </div>
+      )}
+
+      <div className="absolute bottom-10 right-4 z-20 flex flex-col items-center gap-2">
+        <MapButton title="Reset view" onClick={resetView}>
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
+        </MapButton>
+        <MapButton title={is3D ? "Switch to 2D" : "Switch to 3D"} onClick={toggle3D}>
+          <span className="text-[11px] font-bold">{is3D ? "2D" : "3D"}</span>
+        </MapButton>
+        <MapButton title="Reset north (right-drag to rotate/tilt)" onClick={resetNorth}>
+          <svg viewBox="0 0 24 24" className="h-5 w-5" style={{ transform: `rotate(${-bearing}deg)`, transition: "transform 80ms linear" }}>
+            <path d="M12 3l3.5 9h-7z" fill="#ff5a5a" />
+            <path d="M12 21l-3.5-9h7z" fill="currentColor" opacity="0.6" />
+          </svg>
+        </MapButton>
+        <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] backdrop-blur-md shadow-lg">
+          <button
+            title="Zoom in"
+            onClick={() => zoomBy(1)}
+            className="flex h-10 w-10 cursor-pointer items-center justify-center text-lg text-[var(--glass-text)] hover:bg-[var(--glass-highlight)]"
+          >
+            +
+          </button>
+          <div className="mx-2 h-px bg-[var(--glass-border)]" />
+          <button
+            title="Zoom out"
+            onClick={() => zoomBy(-1)}
+            className="flex h-10 w-10 cursor-pointer items-center justify-center text-lg text-[var(--glass-text)] hover:bg-[var(--glass-highlight)]"
+          >
+            −
+          </button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function MapButton({ title, onClick, children }: { title: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] text-[var(--glass-text)] shadow-lg backdrop-blur-md hover:bg-[var(--glass-highlight)]"
+    >
+      {children}
+    </button>
   );
 }

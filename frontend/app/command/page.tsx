@@ -50,8 +50,10 @@ export default function CommandCenter() {
     <div className="relative h-screen w-screen overflow-hidden" data-theme="dark">
       <KeralaMap
         snapshot={snapshot}
+        selection={selection}
         onSelectRiver={(id) => setSelection({ type: "river", id })}
         onSelectDam={(id) => setSelection({ type: "dam", id })}
+        onDeselect={() => setSelection(null)}
       />
       <div className="atmosphere-vignette" />
       <div className="atmosphere-overlay" />
