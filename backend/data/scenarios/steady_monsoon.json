@@ -1,0 +1,15 @@
+{
+  "id": "steady_monsoon",
+  "name": "Steady monsoon — watch only",
+  "description": "Persistent moderate rain: rivers rise to warning levels but stay below danger. Useful for showing the system does not over-alarm.",
+  "duration_s": 180,
+  "represents_hours": 24,
+  "rivers": {
+    "*":       { "peak_above_danger_m": -1.2, "onset": 0.10, "peak_at": 0.80, "recession_m_per_hr": 0.03 },
+    "periyar": { "peak_above_danger_m": -0.5, "onset": 0.05, "peak_at": 0.80, "recession_m_per_hr": 0.03 },
+    "pamba":   { "peak_above_danger_m": -0.4, "onset": 0.05, "peak_at": 0.85, "recession_m_per_hr": 0.03 }
+  },
+  "dams": {
+    "idukki": { "storage_start_pct": 60, "storage_peak_pct": 74, "inflow_base": 300, "inflow_peak": 700, "outflow_base": 290 }
+  }
+}

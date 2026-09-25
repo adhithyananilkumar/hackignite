@@ -34,13 +34,48 @@ export interface RiverForecast {
   danger_crossing_hours: number | null;
 }
 
-export interface ImpactSummary {
-  basin_id: string;
+export interface ImpactCounts {
   population: number;
   hospitals: number;
   schools: number;
   shelters: number;
   bridges: number;
+}
+
+export interface ExposedAsset {
+  id: string;
+  name: string;
+  type: "hospital" | "school" | "shelter" | "bridge";
+  depth_m: number;
+  lon: number;
+  lat: number;
+}
+
+export interface FloodHorizon extends ImpactCounts {
+  horizon_hours: number;
+  level_m: number;
+  stage_m: number;
+  confidence_pct: number;
+  flooded_area_km2: number;
+  max_depth_m: number;
+  exposed_assets: ExposedAsset[];
+}
+
+export interface RiverFloodForecast {
+  river_id: string;
+  danger_level_m: number;
+  horizons: FloodHorizon[];
+}
+
+export interface FloodForecast {
+  model: string;
+  model_label: string;
+  generated_at: string;
+  horizons_hours: number[];
+  horizon_tiles: (string | null)[];
+  depth_bands: { min_m: number; color: string }[];
+  rivers: RiverFloodForecast[];
+  unmodelled_rivers: string[];
 }
 
 export interface Alert {
@@ -72,7 +107,7 @@ export const api = {
   boundaryGeoJson: () => getJson<GeoJSON.FeatureCollection>("/boundary/geojson"),
   impactGeoJson: () => getJson<GeoJSON.FeatureCollection>("/impact/geojson"),
   forecast: (riverId: string) => getJson<RiverForecast>(`/forecast/rivers/${riverId}`),
-  impact: (basinId: string) => getJson<ImpactSummary>(`/impact/${basinId}`),
+  floodForecast: () => getJson<FloodForecast>("/flood/forecast"),
   alerts: () => getJson<Alert[]>("/alerts"),
   health: () => getJson<{ sources: DataHealthSource[] }>("/health"),
   ackAlert: (id: string) => fetch(`${API_BASE}/alerts/${id}/ack`, { method: "POST" }),

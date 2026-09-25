@@ -1,0 +1,96 @@
+{
+  "rivers": {
+    "periyar": {
+      "cells": 289204,
+      "water_cells": 47237,
+      "grid": [
+        1631,
+        1726
+      ],
+      "population_in_corridor": 1212991,
+      "bytes": 502726
+    },
+    "bharathapuzha": {
+      "cells": 170007,
+      "water_cells": 9824,
+      "grid": [
+        539,
+        1311
+      ],
+      "population_in_corridor": 717991,
+      "bytes": 288433
+    },
+    "pamba": {
+      "cells": 224360,
+      "water_cells": 23993,
+      "grid": [
+        581,
+        1472
+      ],
+      "population_in_corridor": 1224121,
+      "bytes": 281161
+    },
+    "chaliyar": {
+      "cells": 69751,
+      "water_cells": 5459,
+      "grid": [
+        658,
+        852
+      ],
+      "population_in_corridor": 440017,
+      "bytes": 162452
+    },
+    "chalakudy": {
+      "cells": 119862,
+      "water_cells": 12598,
+      "grid": [
+        518,
+        411
+      ],
+      "population_in_corridor": 638325,
+      "bytes": 172323
+    },
+    "achankovil": {
+      "cells": 107155,
+      "water_cells": 3174,
+      "grid": [
+        309,
+        669
+      ],
+      "population_in_corridor": 678667,
+      "bytes": 135362
+    },
+    "kabini": {
+      "cells": 14919,
+      "water_cells": 1029,
+      "grid": [
+        256,
+        346
+      ],
+      "population_in_corridor": 29937,
+      "bytes": 33348
+    },
+    "valapattanam": {
+      "cells": 56726,
+      "water_cells": 8327,
+      "grid": [
+        392,
+        750
+      ],
+      "population_in_corridor": 230555,
+      "bytes": 122299
+    }
+  },
+  "model": "rem-v1",
+  "built_at": "2026-09-25T05:29:57.968384+00:00",
+  "zoom": 11,
+  "corridor_deg": 0.1,
+  "max_rem_m": 15.0,
+  "sources": {
+    "terrain": "AWS Terrain Tiles (SRTM/NASADEM-derived), terrarium z11",
+    "permanent_water": "OpenStreetMap natural=water / waterway=riverbank",
+    "population": "Census of India 2011 district density",
+    "assets": "OpenStreetMap via Overpass"
+  },
+  "lateral_attenuation_m_per_km": 0.3
+}

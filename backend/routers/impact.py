@@ -4,8 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from models import ImpactSummary
-from services.impact_engine import compute_impact
-from services.simulator import simulator
+from services.impact_engine import DEFAULT_HORIZON_HR, compute_impact
 
 router = APIRouter(prefix="/impact", tags=["impact"])
 
@@ -20,8 +19,8 @@ def get_impact_geojson():
 
 
 @router.get("/{basin_id}", response_model=ImpactSummary)
-def get_impact(basin_id: str):
-    reading = simulator.get_river(basin_id)
-    if reading is None:
-        raise HTTPException(status_code=404, detail="Unknown basin")
-    return compute_impact(basin_id, reading.risk)
+def get_impact(basin_id: str, horizon_hours: float = DEFAULT_HORIZON_HR):
+    impact = compute_impact(basin_id, horizon_hours)
+    if impact is None:
+        raise HTTPException(status_code=404, detail="Unknown or unmodelled basin")
+    return impact

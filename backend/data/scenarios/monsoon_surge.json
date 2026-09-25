@@ -1,0 +1,15 @@
+{
+  "id": "monsoon_surge",
+  "name": "Monsoon surge — central Kerala",
+  "description": "Intense rainfall over the Periyar, Pamba and Bharathapuzha catchments; Idukki storage climbs toward its rule curve.",
+  "duration_s": 180,
+  "represents_hours": 36,
+  "rivers": {
+    "periyar":       { "peak_above_danger_m": 1.2, "onset": 0.05, "peak_at": 0.80, "recession_m_per_hr": 0.06 },
+    "pamba":         { "peak_above_danger_m": 0.9, "onset": 0.10, "peak_at": 0.85, "recession_m_per_hr": 0.05 },
+    "bharathapuzha": { "peak_above_danger_m": 0.5, "onset": 0.15, "peak_at": 0.90, "recession_m_per_hr": 0.05 }
+  },
+  "dams": {
+    "idukki": { "storage_start_pct": 55, "storage_peak_pct": 97, "inflow_base": 380, "inflow_peak": 1780, "outflow_base": 360 }
+  }
+}

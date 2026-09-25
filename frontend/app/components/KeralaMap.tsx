@@ -2,7 +2,7 @@
 
 import type * as maplibregl from "maplibre-gl";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api } from "../lib/api";
+import { API_BASE, api, type FloodForecast } from "../lib/api";
 import type { LiveSnapshot } from "../lib/useLiveData";
 
 // maplibre-gl is loaded from a CDN <script>, injected manually below, instead
@@ -58,6 +58,37 @@ const TERRAIN_DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium
 const ROUTE_HIGHLIGHT_COLOR = "#9fe9ff";
 
 export type MapSelection = { type: "river" | "dam"; id: string } | null;
+export type MapFocus = { lon: number; lat: number; key: string } | null;
+
+const ASSET_LABELS: Record<string, string> = {
+  hospital: "Hospital",
+  school: "School",
+  shelter: "Relief shelter",
+  bridge: "Bridge",
+};
+const FLOOD_OPACITY = 0.9;
+const FLOOD_CROSSFADE_MS = 700;
+// The model grid is ~75 m (z11); beyond z12 MapLibre overzooms with smoothing.
+const FLOOD_TILE_MAXZOOM = 12;
+
+type HoverInfo = { x: number; y: number; label: string; name: string; detail: string };
+
+function exposedCollection(flood: FloodForecast | null, horizonIndex: number) {
+  const seen = new Set<string>();
+  const features: GeoJSON.Feature[] = [];
+  for (const river of flood?.rivers ?? []) {
+    for (const a of river.horizons[horizonIndex]?.exposed_assets ?? []) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
+      features.push({
+        type: "Feature",
+        properties: { id: a.id, name: a.name, type: a.type, depth_m: a.depth_m },
+        geometry: { type: "Point", coordinates: [a.lon, a.lat] },
+      });
+    }
+  }
+  return { type: "FeatureCollection" as const, features };
+}
 
 function ringBounds(ring: [number, number][]) {
   let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
@@ -110,12 +141,18 @@ function buildMask(keralaOuterRing: [number, number][]) {
 export function KeralaMap({
   snapshot,
   selection = null,
+  flood = null,
+  horizonIndex = 0,
+  focus = null,
   onSelectRiver,
   onSelectDam,
   onDeselect,
 }: {
   snapshot: LiveSnapshot | null;
   selection?: MapSelection;
+  flood?: FloodForecast | null;
+  horizonIndex?: number;
+  focus?: MapFocus;
   onSelectRiver?: (id: string) => void;
   onSelectDam?: (id: string) => void;
   onDeselect?: () => void;
@@ -132,9 +169,62 @@ export function KeralaMap({
   const hoverIdRef = useRef<string | null>(null);
   const [bearing, setBearing] = useState(0);
   const [pitch, setPitch] = useState(52);
-  const [hover, setHover] = useState<{ x: number; y: number; name: string; kind: "River" | "Dam" } | null>(
-    null
-  );
+  const [hover, setHover] = useState<HoverInfo | null>(null);
+  const floodRef = useRef<FloodForecast | null>(flood);
+  const horizonRef = useRef(horizonIndex);
+  const floodUrlsRef = useRef<Record<string, string>>({});
+  const mapReadyRef = useRef(false);
+
+  useEffect(() => {
+    floodRef.current = flood;
+    horizonRef.current = horizonIndex;
+    syncFlood();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flood, horizonIndex]);
+
+  useEffect(() => {
+    if (!focus) return;
+    mapRef.current?.flyTo({ center: [focus.lon, focus.lat], zoom: 14.2, pitch: 62, duration: 1600, essential: true });
+  }, [focus]);
+
+  // One raster tile layer per forecast horizon, each compositing every river.
+  // Tile sources (unlike image sources) drape onto 3D terrain. Moving along the
+  // timeline crossfades opacity; a new forecast swaps the layer's tile URL.
+  function syncFlood() {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current) return;
+    const forecast = floodRef.current;
+    const active = horizonRef.current;
+    const wanted = new Set<string>();
+
+    (forecast?.horizon_tiles ?? []).forEach((template, i) => {
+      if (!template) return;
+      const id = `flood-h${i}`;
+      const url = `${API_BASE}${template}`;
+      wanted.add(id);
+      if (!map.getSource(id)) {
+        map.addSource(id, { type: "raster", tiles: [url], tileSize: 256, minzoom: 5, maxzoom: FLOOD_TILE_MAXZOOM });
+        map.addLayer(
+          { id, type: "raster", source: id, paint: { "raster-opacity": 0, "raster-fade-duration": 200 } },
+          "rivers-glow"
+        );
+        map.setPaintProperty(id, "raster-opacity-transition", { duration: FLOOD_CROSSFADE_MS, delay: 0 });
+      } else if (floodUrlsRef.current[id] !== url) {
+        (map.getSource(id) as maplibregl.RasterTileSource).setTiles([url]);
+      }
+      floodUrlsRef.current[id] = url;
+      map.setPaintProperty(id, "raster-opacity", i === active ? FLOOD_OPACITY : 0);
+    });
+
+    for (const id of Object.keys(floodUrlsRef.current)) {
+      if (wanted.has(id)) continue;
+      map.removeLayer(id);
+      map.removeSource(id);
+      delete floodUrlsRef.current[id];
+    }
+
+    (map.getSource("exposed") as maplibregl.GeoJSONSource | undefined)?.setData(exposedCollection(forecast, active));
+  }
 
   useEffect(() => {
     onSelectRiverRef.current = onSelectRiver;
@@ -314,6 +404,7 @@ export function KeralaMap({
         antialias: true,
       });
       mapRef.current = map;
+      (window as unknown as { __map: unknown }).__map = map; // TEMP debug
       // Google-Maps-style gestures: left-drag pans, right-drag (or ctrl+drag)
       // rotates and tilts, wheel zooms toward the cursor, double-click zooms in.
       map.dragRotate.enable();
@@ -409,9 +500,9 @@ export function KeralaMap({
           id: "impact-points",
           type: "circle",
           source: "impact",
-          minzoom: 8,
+          minzoom: 10,
           paint: {
-            "circle-radius": 4,
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2.5, 14, 5],
             "circle-color": [
               "match",
               ["get", "type"],
@@ -423,7 +514,7 @@ export function KeralaMap({
             ],
             "circle-stroke-width": 1,
             "circle-stroke-color": "#04070c",
-            "circle-opacity": 0.9,
+            "circle-opacity": 0.55,
           },
         });
 
@@ -473,6 +564,57 @@ export function KeralaMap({
           source: "rivers",
           layout: { "line-cap": "round", "line-join": "round" },
           paint: { "line-color": "#000", "line-width": 34, "line-opacity": 0.01 },
+        });
+
+        // --- Assets inside the forecast flood extent at the active horizon ---
+        const assetColor = [
+          "match",
+          ["get", "type"],
+          "hospital", IMPACT_COLORS.hospital,
+          "school", IMPACT_COLORS.school,
+          "shelter", IMPACT_COLORS.shelter,
+          "bridge", IMPACT_COLORS.bridge,
+          "#b9c4cc",
+        ] as unknown as maplibregl.ExpressionSpecification;
+        const assetSize = (big: number, small: number) =>
+          ["match", ["get", "type"], "hospital", big, "shelter", big, small] as unknown as maplibregl.ExpressionSpecification;
+        map.addSource("exposed", { type: "geojson", data: exposedCollection(null, 0) });
+        map.addLayer({
+          id: "exposed-halo",
+          type: "circle",
+          source: "exposed",
+          paint: {
+            "circle-radius": assetSize(13, 9),
+            "circle-color": assetColor,
+            "circle-blur": 1,
+            "circle-opacity": 0.45,
+          },
+        });
+        map.addLayer({
+          id: "exposed-points",
+          type: "circle",
+          source: "exposed",
+          paint: {
+            "circle-radius": assetSize(5.5, 4),
+            "circle-color": assetColor,
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+        map.addLayer({
+          id: "exposed-label",
+          type: "symbol",
+          source: "exposed",
+          minzoom: 11.5,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 10.5,
+            "text-offset": [0, 1.1],
+            "text-anchor": "top",
+            "text-optional": true,
+            "text-font": ["Noto Sans Regular"],
+          },
+          paint: { "text-color": "#eaf2f6", "text-halo-color": "#04070c", "text-halo-width": 1.2 },
         });
 
         // --- Dams ---
@@ -547,18 +689,49 @@ export function KeralaMap({
         setBearing(map.getBearing());
         setPitch(map.getPitch());
 
-        // Dams sit on top of rivers, so they win when both are under the cursor.
+        // Priority when several things are under the cursor: dams, then assets
+        // (small targets), then rivers (wide hit area).
         const TOLERANCE = 8;
-        const pick = ({ x, y }: { x: number; y: number }) => {
+        const ASSET_TOLERANCE = 5;
+        type Hit =
+          | { kind: "dam" | "river"; id: string; name: string }
+          | { kind: "asset"; name: string; type: string; depth: number | null; lngLat: [number, number] };
+        const around = (x: number, y: number, r: number): [[number, number], [number, number]] => [
+          [x - r, y - r],
+          [x + r, y + r],
+        ];
+        const pick = ({ x, y }: { x: number; y: number }): Hit | null => {
           const dam = map.queryRenderedFeatures([x, y], { layers: ["dams-hit"] })[0];
-          if (dam) return { kind: "Dam" as const, id: dam.properties?.id as string, name: dam.properties?.name as string };
-          const box: [[number, number], [number, number]] = [
-            [x - TOLERANCE, y - TOLERANCE],
-            [x + TOLERANCE, y + TOLERANCE],
-          ];
-          const river = map.queryRenderedFeatures(box, { layers: ["rivers-hit"] })[0];
-          if (river) return { kind: "River" as const, id: river.properties?.id as string, name: river.properties?.name as string };
+          if (dam) return { kind: "dam", id: dam.properties?.id, name: dam.properties?.name };
+          const asset =
+            map.queryRenderedFeatures(around(x, y, ASSET_TOLERANCE), { layers: ["exposed-points"] })[0] ??
+            map.queryRenderedFeatures(around(x, y, ASSET_TOLERANCE), { layers: ["impact-points"] })[0];
+          if (asset) {
+            return {
+              kind: "asset",
+              name: asset.properties?.name,
+              type: asset.properties?.type,
+              depth: asset.layer.id === "exposed-points" ? Number(asset.properties?.depth_m) : null,
+              lngLat: (asset.geometry as GeoJSON.Point).coordinates as [number, number],
+            };
+          }
+          const river = map.queryRenderedFeatures(around(x, y, TOLERANCE), { layers: ["rivers-hit"] })[0];
+          if (river) return { kind: "river", id: river.properties?.id, name: river.properties?.name };
           return null;
+        };
+
+        const describe = (hit: Hit): Omit<HoverInfo, "x" | "y"> => {
+          if (hit.kind !== "asset") {
+            return { label: hit.kind === "dam" ? "Dam" : "River", name: hit.name, detail: "Click to fly in" };
+          }
+          return {
+            label: ASSET_LABELS[hit.type] ?? hit.type,
+            name: hit.name,
+            detail:
+              hit.depth === null
+                ? "Outside forecast flood extent"
+                : `Inside forecast extent · ~${hit.depth.toFixed(1)} m modelled depth`,
+          };
         };
 
         const setRiverHover = (id: string | null) => {
@@ -580,8 +753,8 @@ export function KeralaMap({
           const hit = pick(e.point);
           if (!hit) return clearHover();
           map.getCanvas().style.cursor = "pointer";
-          setRiverHover(hit.kind === "River" ? hit.id : null);
-          setHover({ x: e.point.x, y: e.point.y, name: hit.name, kind: hit.kind });
+          setRiverHover(hit.kind === "river" ? hit.id : null);
+          setHover({ x: e.point.x, y: e.point.y, ...describe(hit) });
         });
         map.on("mouseout", clearHover);
         map.on("movestart", clearHover);
@@ -589,11 +762,15 @@ export function KeralaMap({
         map.on("click", (e: maplibregl.MapMouseEvent) => {
           const hit = pick(e.point);
           if (!hit) return onDeselectRef.current?.();
-          if (hit.kind === "Dam") onSelectDamRef.current?.(hit.id);
+          if (hit.kind === "asset") {
+            map.flyTo({ center: hit.lngLat, zoom: Math.max(map.getZoom(), 14), pitch: 62, duration: 1200, essential: true });
+          } else if (hit.kind === "dam") onSelectDamRef.current?.(hit.id);
           else onSelectRiverRef.current?.(hit.id);
         });
 
         applySnapshotColors();
+        mapReadyRef.current = true;
+        syncFlood();
       });
     }
 
@@ -638,9 +815,9 @@ export function KeralaMap({
           className="pointer-events-none absolute z-20 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] px-2.5 py-1.5 text-xs text-[var(--glass-text)] shadow-lg backdrop-blur-md"
           style={{ left: hover.x + 14, top: hover.y + 14 }}
         >
-          <span className="mr-1.5 text-[10px] uppercase tracking-wider text-[var(--glass-text-dim)]">{hover.kind}</span>
+          <span className="mr-1.5 text-[10px] uppercase tracking-wider text-[var(--glass-text-dim)]">{hover.label}</span>
           <span className="font-semibold">{hover.name}</span>
-          <div className="mt-0.5 text-[10px] text-[var(--glass-text-dim)]">Click to fly in</div>
+          <div className="mt-0.5 text-[10px] text-[var(--glass-text-dim)]">{hover.detail}</div>
         </div>
       )}
 

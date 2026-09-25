@@ -1,17 +1,20 @@
 from fastapi import APIRouter, HTTPException
 
 from models import RiverForecast
-from services.risk_engine import danger_crossing_hours, forecast_river_level
-from services.simulator import simulator
+from services.sources.hub import hub
 
 router = APIRouter(prefix="/forecast", tags=["forecast"])
+
+RIVER_FORECAST_HORIZONS_HR = (1.0, 3.0, 6.0, 12.0)
 
 
 @router.get("/rivers/{river_id}", response_model=RiverForecast)
 def get_river_forecast(river_id: str):
-    reading = simulator.get_river(river_id)
+    reading = hub.get_river(river_id)
     if reading is None:
         raise HTTPException(status_code=404, detail="Unknown river")
-    points = forecast_river_level(reading.level_m, reading.rise_rate_m_per_hr)
-    crossing = danger_crossing_hours(reading.level_m, reading.danger_level_m, reading.rise_rate_m_per_hr)
-    return RiverForecast(river_id=river_id, points=points, danger_crossing_hours=crossing)
+    return RiverForecast(
+        river_id=river_id,
+        points=hub.level_forecast(reading, RIVER_FORECAST_HORIZONS_HR),
+        danger_crossing_hours=hub.danger_crossing_hours(reading),
+    )

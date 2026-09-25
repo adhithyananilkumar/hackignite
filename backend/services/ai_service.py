@@ -1,21 +1,50 @@
 """AI explanation/Q&A layer. Claude is only ever handed structured numeric context
-built from the simulator + impact engine — it never invents its own numbers."""
+built from the active data source + flood/impact model — it never invents its own numbers."""
 
 import json
 import os
 
 from anthropic import AsyncAnthropic
 
-from services.impact_engine import compute_impact
-from services.risk_engine import danger_crossing_hours, forecast_river_level
-from services.simulator import FEATURED_RIVER_CONFIG, simulator
+from models import RiskLevel
+from services.flood_forecast import build_flood_forecast
+from services.sources.hub import hub
+
+_NAMED_ASSETS_PER_TYPE = 8
+
+
+def _exposure_context(river_id: str) -> dict:
+    """Modelled flood exposure per forecast horizon, with the named hospitals and
+    shelters inside the extent so the assistant can answer 'which' questions."""
+    forecast = build_flood_forecast({river_id})
+    if not forecast.rivers:
+        return {"modelled": False}
+    horizons = {}
+    for h in forecast.rivers[0].horizons:
+        named = {}
+        for kind in ("hospital", "shelter", "school"):
+            assets = [a for a in h.exposed_assets if a.type == kind][:_NAMED_ASSETS_PER_TYPE]
+            if assets:
+                named[kind] = [{"name": a.name, "depth_m": a.depth_m} for a in assets]
+        horizons[f"T+{h.horizon_hours:g}h"] = {
+            "flooded_area_km2": h.flooded_area_km2,
+            "max_depth_m": h.max_depth_m,
+            "population": h.population,
+            "hospitals": h.hospitals,
+            "schools": h.schools,
+            "shelters": h.shelters,
+            "bridges": h.bridges,
+            "named_exposed_assets": named,
+        }
+    return {"modelled": True, "model": forecast.model_label, "note": "modelled potential exposure, not confirmed damage", "horizons": horizons}
 
 _client: AsyncAnthropic | None = None
 _MODEL = "claude-sonnet-5"
 
 SYSTEM_PROMPT = (
     "You are VARUNA's decision-support assistant for Kerala flood monitoring. "
-    "You are given a JSON snapshot of live river, dam and exposure data. "
+    "You are given a JSON snapshot of river, dam and exposure data; `data_source` says "
+    "whether it is live or a simulated scenario — say so when it is simulated. "
     "Answer only from that JSON — never invent numbers. Be concise, operational, "
     "and do not issue commands to open/close dams; only note when thresholds are "
     "being approached, consistent with Kerala's approved rule curves and EAPs."
@@ -30,28 +59,37 @@ def _get_client() -> AsyncAnthropic | None:
 
 
 def build_context() -> dict:
-    context: dict = {"rivers": {}, "dams": {}, "exposure": {}}
-    for river_id in FEATURED_RIVER_CONFIG:
-        reading = simulator.get_river(river_id)
-        if reading is None:
-            continue
-        forecast = forecast_river_level(reading.level_m, reading.rise_rate_m_per_hr)
-        crossing = danger_crossing_hours(reading.level_m, reading.danger_level_m, reading.rise_rate_m_per_hr)
-        context["rivers"][river_id] = {
+    """Every river, but full forecast/exposure detail only for rivers above
+    NORMAL, so the prompt stays small as more rivers are added."""
+    active = hub.active
+    context: dict = {
+        "data_source": {"mode": active.label, "kind": active.kind, "note": active.description},
+        "rivers": {},
+        "dams": {},
+        "exposure": {},
+    }
+    for reading in hub.list_rivers():
+        entry = {
             "current_m": reading.level_m,
             "danger_m": reading.danger_level_m,
             "warning_m": reading.warning_level_m,
             "rise_rate_m_per_hr": reading.rise_rate_m_per_hr,
             "risk": reading.risk.value,
-            "forecast": [p.model_dump() for p in forecast],
-            "danger_crossing_hours": crossing,
         }
-        impact = compute_impact(river_id, reading.risk)
-        context["exposure"][river_id] = impact.model_dump()
+        if reading.discharge_m3s is not None:
+            entry["discharge_m3s"] = reading.discharge_m3s
+        if reading.rain_next_24h_mm is not None:
+            entry["rain_past_24h_mm"] = reading.rain_past_24h_mm
+            entry["rain_next_24h_mm"] = reading.rain_next_24h_mm
+        if reading.risk != RiskLevel.NORMAL:
+            entry["forecast"] = [p.model_dump() for p in hub.level_forecast(reading, (1.0, 3.0, 6.0, 12.0))]
+            entry["danger_crossing_hours"] = hub.danger_crossing_hours(reading)
+            context["exposure"][reading.river_id] = _exposure_context(reading.river_id)
+        context["rivers"][reading.river_id] = entry
 
-    idukki = simulator.get_dam("idukki")
-    if idukki:
-        context["dams"]["idukki"] = idukki.model_dump(mode="json")
+    for dam in hub.list_dams():
+        if dam.risk != RiskLevel.NORMAL or dam.source != "static":
+            context["dams"][dam.dam_id] = dam.model_dump(mode="json")
 
     return context
 

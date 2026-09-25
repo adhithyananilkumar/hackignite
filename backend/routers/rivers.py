@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from services.simulator import simulator
+from services.sources.hub import hub
 
 router = APIRouter(prefix="/rivers", tags=["rivers"])
 
@@ -19,12 +19,12 @@ def get_rivers_geojson():
 
 @router.get("")
 def list_rivers():
-    return simulator.list_rivers()
+    return hub.list_rivers()
 
 
 @router.get("/{river_id}")
 def get_river(river_id: str):
-    reading = simulator.get_river(river_id)
+    reading = hub.get_river(river_id)
     if reading is None:
         raise HTTPException(status_code=404, detail="Unknown river")
     return reading

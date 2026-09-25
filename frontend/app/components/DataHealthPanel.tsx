@@ -8,6 +8,7 @@ const STATUS_COLOR: Record<string, string> = {
   LIVE: "risk-text-NORMAL",
   SIMULATED: "risk-text-WATCH",
   STATIC: "risk-text-ADVISORY",
+  MODELLED: "text-[#7fd4ff]",
   OFFLINE: "risk-text-CRITICAL",
   UNAVAILABLE: "risk-text-CRITICAL",
 };

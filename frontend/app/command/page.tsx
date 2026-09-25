@@ -1,26 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AIAssistant } from "../components/AIAssistant";
 import { AlertCenter } from "../components/AlertCenter";
 import { DamPanel } from "../components/DamPanel";
 import { DataHealthPanel } from "../components/DataHealthPanel";
+import { FloodTimeline } from "../components/FloodTimeline";
 import { GlassPanel } from "../components/glass/GlassPanel";
-import { KeralaMap } from "../components/KeralaMap";
+import { KeralaMap, type MapFocus, type MapSelection } from "../components/KeralaMap";
 import { RiverPanel } from "../components/RiverPanel";
-import { api } from "../lib/api";
+import { api, type ExposedAsset } from "../lib/api";
+import { useFloodForecast } from "../lib/useFloodForecast";
 import { useLiveData } from "../lib/useLiveData";
-
-type Selection = { type: "river" | "dam"; id: string } | null;
 
 const RISK_ORDER = ["NORMAL", "WATCH", "ADVISORY", "HIGH", "CRITICAL"];
 
 export default function CommandCenter() {
   const { snapshot, connected } = useLiveData();
+  const flood = useFloodForecast();
   const [riverNames, setRiverNames] = useState<Record<string, string>>({});
   const [damNames, setDamNames] = useState<Record<string, string>>({});
-  const [selection, setSelection] = useState<Selection>(null);
+  const [selection, setSelection] = useState<MapSelection>(null);
+  const [horizonIndex, setHorizonIndex] = useState(0);
+  const [focus, setFocus] = useState<MapFocus>(null);
+  const focusAsset = useCallback(
+    (a: ExposedAsset) => setFocus({ lon: a.lon, lat: a.lat, key: `${a.id}-${Date.now()}` }),
+    []
+  );
 
   useEffect(() => {
     api.riversGeoJson().then((fc) => {
@@ -51,6 +58,9 @@ export default function CommandCenter() {
       <KeralaMap
         snapshot={snapshot}
         selection={selection}
+        flood={flood}
+        horizonIndex={horizonIndex}
+        focus={focus}
         onSelectRiver={(id) => setSelection({ type: "river", id })}
         onSelectDam={(id) => setSelection({ type: "dam", id })}
         onDeselect={() => setSelection(null)}
@@ -124,6 +134,11 @@ export default function CommandCenter() {
         <AIAssistant />
       </div>
 
+      {/* Flood forecast timeline */}
+      <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
+        <FloodTimeline forecast={flood} horizonIndex={horizonIndex} onHorizonChange={setHorizonIndex} />
+      </div>
+
       {/* Detail panel */}
       {selection && (
         <div className="absolute bottom-4 left-4 z-10">
@@ -132,6 +147,10 @@ export default function CommandCenter() {
               riverId={selection.id}
               reading={snapshot?.rivers?.[selection.id]}
               name={riverNames[selection.id] ?? selection.id}
+              flood={flood?.rivers.find((r) => r.river_id === selection.id)}
+              horizonIndex={horizonIndex}
+              onHorizonChange={setHorizonIndex}
+              onFocusAsset={focusAsset}
               onClose={() => setSelection(null)}
             />
           ) : (
