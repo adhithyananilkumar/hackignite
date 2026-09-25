@@ -63,7 +63,7 @@ export function KeralaOverview({
 
   return (
     <div>
-      <div className="border-b border-[#e8eaed] px-5 pb-4 pt-5">
+      <div className="border-b border-black/[0.07] px-5 pb-4 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-[22px] font-normal leading-7 text-[#202124]">Kerala</h2>
@@ -77,7 +77,7 @@ export function KeralaOverview({
             [peakPeople.toLocaleString(), `Peak people in flood area, next ${flood?.horizons_hours[lastHorizon] ?? 12}h`],
             [`${damsOnWatch}/${dams.length}`, "Dams on watch"],
           ].map(([value, label]) => (
-            <div key={label} className="rounded-lg bg-[#f1f3f4] px-2.5 py-2">
+            <div key={label} className="rounded-lg bg-white/55 px-2.5 py-2">
               <div className="text-base font-medium tabular-nums text-[#202124]">{value}</div>
               <div className="text-[11px] leading-tight text-[#5f6368]">{label}</div>
             </div>
@@ -89,7 +89,7 @@ export function KeralaOverview({
         <AIAssistant />
       </Section>
 
-      <div role="tablist" className="flex border-b border-[#e8eaed] px-2">
+      <div role="tablist" className="flex border-b border-black/[0.07] px-2">
         {(["rivers", "dams"] as const).map((t) => (
           <button
             key={t}
@@ -110,7 +110,7 @@ export function KeralaOverview({
               <li key={r.river_id}>
                 <button
                   onClick={() => onSelect({ type: "river", id: r.river_id })}
-                  className="flex w-full cursor-pointer items-center gap-3 px-5 py-2.5 text-left hover:bg-[#f8f9fa]"
+                  className="flex w-full cursor-pointer items-center gap-3 px-5 py-2.5 text-left hover:bg-white/60"
                 >
                   <ListIcon kind="river" />
                   <div className="min-w-0 flex-1">
@@ -128,7 +128,7 @@ export function KeralaOverview({
               <li key={d.dam_id}>
                 <button
                   onClick={() => onSelect({ type: "dam", id: d.dam_id })}
-                  className="flex w-full cursor-pointer items-center gap-3 px-5 py-2.5 text-left hover:bg-[#f8f9fa]"
+                  className="flex w-full cursor-pointer items-center gap-3 px-5 py-2.5 text-left hover:bg-white/60"
                 >
                   <ListIcon kind="dam" />
                   <div className="min-w-0 flex-1">

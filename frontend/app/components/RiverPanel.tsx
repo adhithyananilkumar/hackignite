@@ -14,7 +14,7 @@ const SOURCE_LABELS: Record<string, string> = {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-lg bg-[#f1f3f4] px-3 py-2">
+    <div className="rounded-lg bg-white/55 px-3 py-2">
       <div className="text-base font-medium tabular-nums text-[#202124]">{value}</div>
       <div className="text-xs text-[#5f6368]">{label}</div>
     </div>
@@ -75,7 +75,7 @@ export function RiverPanel({
             {rising ? "↑" : "↓"} {Math.abs(reading.rise_rate_m_per_hr).toFixed(2)} m/h
           </span>
         </div>
-        <div className="relative h-2 overflow-hidden rounded-full bg-[#e8eaed]">
+        <div className="relative h-2 overflow-hidden rounded-full bg-black/[0.08]">
           <div className={`h-full risk-${reading.risk}`} style={{ width: `${pct}%` }} />
           <div className="absolute top-0 h-full w-0.5 bg-[#5f6368]" style={{ left: `${warningPct}%` }} title="Warning level" />
         </div>
@@ -110,7 +110,7 @@ export function RiverPanel({
                   key={h.horizon_hours}
                   onClick={() => onHorizonChange(i)}
                   className={`cursor-pointer rounded-lg border px-2 py-1.5 text-left transition-colors ${
-                    i === horizonIndex ? "border-[#1a73e8] bg-[#e8f0fe]" : "border-[#dadce0] bg-white hover:bg-[#f8f9fa]"
+                    i === horizonIndex ? "border-[#1a73e8] bg-[#e8f0fe]" : "border-black/[0.08] bg-white/50 hover:bg-white/75"
                   }`}
                 >
                   <div className={`text-[11px] ${i === horizonIndex ? "text-[#1967d2]" : "text-[#70757a]"}`}>

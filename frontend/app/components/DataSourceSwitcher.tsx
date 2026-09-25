@@ -56,7 +56,7 @@ export function DataSourceSwitcher({ snapshot, connected }: { snapshot: LiveSnap
       </div>
 
       <div className="px-4 pb-3">
-        <div role="radiogroup" aria-label="Data source" className="flex rounded-lg border border-[#dadce0] p-0.5">
+        <div role="radiogroup" aria-label="Data source" className="flex rounded-lg border border-black/[0.1] bg-white/35 p-0.5">
           {sources.modes.map((m) => {
             const active = m.id === mode;
             return (
@@ -68,7 +68,7 @@ export function DataSourceSwitcher({ snapshot, connected }: { snapshot: LiveSnap
                 disabled={busy}
                 onClick={() => switchTo(m.id)}
                 className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-[13px] font-medium transition-colors ${
-                  active ? "bg-[#e8f0fe] text-[#1967d2]" : "text-[#5f6368] hover:bg-[#f8f9fa]"
+                  active ? "bg-[#e8f0fe] text-[#1967d2]" : "text-[#5f6368] hover:bg-white/60"
                 }`}
               >
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.id === "live" ? "#1e8e3e" : "#f9ab00" }} />
@@ -118,7 +118,7 @@ function SimulationControls({
   onControl: (body: { scenario_id?: string; action?: "play" | "pause" | "restart"; speed?: number }) => void;
 }) {
   const iconButton =
-    "flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-[#f1f3f4] disabled:opacity-50";
+    "flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-white/70 disabled:opacity-50";
 
   return (
     <div>
@@ -128,7 +128,7 @@ function SimulationControls({
         disabled={busy}
         onChange={(e) => onControl({ scenario_id: e.target.value })}
         title={status.scenarios.find((s) => s.id === status.scenario_id)?.description}
-        className="w-full cursor-pointer rounded-lg border border-[#dadce0] bg-white px-2.5 py-1.5 text-[13px] text-[#202124] outline-none focus:border-[#1a73e8]"
+        className="w-full cursor-pointer rounded-lg border border-black/[0.1] bg-white/60 px-2.5 py-1.5 text-[13px] text-[#202124] outline-none focus:border-[#1a73e8]"
       >
         {status.scenarios.map((s) => (
           <option key={s.id} value={s.id}>
@@ -163,7 +163,7 @@ function SimulationControls({
         </button>
 
         <div className="ml-1 flex flex-1 flex-col gap-1" title="Scenario time">
-          <div className="h-1 overflow-hidden rounded-full bg-[#e8eaed]">
+          <div className="h-1 overflow-hidden rounded-full bg-black/[0.08]">
             <div className="h-full bg-[#1a73e8] transition-all duration-1000" style={{ width: `${status.progress * 100}%` }} />
           </div>
           <div className="text-[11px] tabular-nums text-[#70757a]">
@@ -171,14 +171,14 @@ function SimulationControls({
           </div>
         </div>
 
-        <div className="ml-1 flex rounded-full border border-[#dadce0] p-0.5">
+        <div className="ml-1 flex rounded-full border border-black/[0.1] bg-white/35 p-0.5">
           {status.speeds.map((speed) => (
             <button
               key={speed}
               disabled={busy}
               onClick={() => onControl({ speed })}
               className={`cursor-pointer rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
-                speed === status.speed ? "bg-[#e8f0fe] text-[#1967d2]" : "text-[#5f6368] hover:bg-[#f1f3f4]"
+                speed === status.speed ? "bg-[#e8f0fe] text-[#1967d2]" : "text-[#5f6368] hover:bg-white/70"
               }`}
             >
               {speed}×

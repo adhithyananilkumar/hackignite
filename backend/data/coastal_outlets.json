@@ -1,0 +1,14 @@
+{
+  "note": "Sea points just offshore of the main river mouths / estuary openings on the Kerala coast. Sea level here controls how freely those rivers drain. Coordinates must fall on an ocean cell of the Copernicus Marine global model.",
+  "outlets": [
+    { "id": "kasaragod",          "name": "Kasaragod",            "coordinates": [74.93, 12.49] },
+    { "id": "azhikkal",           "name": "Azhikkal (Kannur)",    "coordinates": [75.25, 11.94] },
+    { "id": "beypore",            "name": "Beypore (Kozhikode)",  "coordinates": [75.75, 11.17] },
+    { "id": "ponnani",            "name": "Ponnani",              "coordinates": [75.87, 10.78] },
+    { "id": "azhikode",           "name": "Azhikode (Munambam)",  "coordinates": [76.12, 10.19] },
+    { "id": "kochi",              "name": "Kochi (Vembanad)",     "coordinates": [76.18, 9.97] },
+    { "id": "thottappally",       "name": "Thottappally (Kuttanad)", "coordinates": [76.33, 9.31] },
+    { "id": "neendakara",         "name": "Neendakara (Kollam)",  "coordinates": [76.50, 8.93] },
+    { "id": "thiruvananthapuram", "name": "Thiruvananthapuram",   "coordinates": [76.88, 8.45] }
+  ]
+}

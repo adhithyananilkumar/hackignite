@@ -919,7 +919,7 @@ export function KeralaMap({
 
       {hover && (
         <div
-          className="pointer-events-none absolute z-20 max-w-[260px] rounded-lg bg-white px-3 py-2 text-[13px] text-[#202124] shadow-[var(--maps-shadow)]"
+          className="pointer-events-none absolute z-20 max-w-[260px] maps-glass-strong !rounded-xl px-3 py-2 text-[13px] text-[#202124]"
           style={{ left: hover.x + 14, top: hover.y + 14 }}
         >
           <div className="font-medium leading-tight">{hover.name}</div>
@@ -945,23 +945,23 @@ export function KeralaMap({
             <path d="M12 21l-3.5-9h7z" fill="#9aa0a6" />
           </svg>
         </MapButton>
-        <div className="flex flex-col overflow-hidden rounded-lg bg-white shadow-[var(--maps-shadow)]">
+        <div className="maps-glass flex flex-col overflow-hidden !rounded-xl">
           <button
             title="Zoom in"
             aria-label="Zoom in"
             onClick={() => zoomBy(1)}
-            className="flex h-10 w-10 cursor-pointer items-center justify-center text-[#5f6368] hover:bg-[#f1f3f4] hover:text-[#202124]"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center text-[#5f6368] hover:bg-white/70 hover:text-[#202124]"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z" />
             </svg>
           </button>
-          <div className="mx-2 h-px bg-[#e8eaed]" />
+          <div className="mx-2 h-px bg-black/[0.08]" />
           <button
             title="Zoom out"
             aria-label="Zoom out"
             onClick={() => zoomBy(-1)}
-            className="flex h-10 w-10 cursor-pointer items-center justify-center text-[#5f6368] hover:bg-[#f1f3f4] hover:text-[#202124]"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center text-[#5f6368] hover:bg-white/70 hover:text-[#202124]"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
               <path d="M19 13H5v-2h14z" />
@@ -979,7 +979,7 @@ function MapButton({ title, onClick, children }: { title: string; onClick: () =>
       title={title}
       aria-label={title}
       onClick={onClick}
-      className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg bg-white text-[#5f6368] shadow-[var(--maps-shadow)] hover:bg-[#f1f3f4] hover:text-[#202124]"
+      className="flex h-10 w-10 cursor-pointer items-center justify-center maps-glass !rounded-xl text-[#5f6368] hover:!bg-white/80 hover:text-[#202124]"
     >
       {children}
     </button>

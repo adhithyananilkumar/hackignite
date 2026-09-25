@@ -38,7 +38,7 @@ export function ImpactPanel({
       </div>
       <div className="grid grid-cols-3 gap-2">
         {rows.map(([name, value]) => (
-          <div key={name} className="rounded-lg bg-[#f1f3f4] px-2.5 py-2">
+          <div key={name} className="rounded-lg bg-white/55 px-2.5 py-2">
             <div className="text-base font-medium tabular-nums text-[#202124]">{value}</div>
             <div className="text-[11px] text-[#5f6368]">{name}</div>
           </div>
@@ -53,7 +53,7 @@ export function ImpactPanel({
               <button
                 key={a.id}
                 onClick={() => onFocusAsset?.(a)}
-                className="-mx-2 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-2 text-left text-[13px] text-[#202124] hover:bg-[#f1f3f4]"
+                className="-mx-2 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-2 text-left text-[13px] text-[#202124] hover:bg-white/70"
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: TYPE_COLOR[a.type] }} />

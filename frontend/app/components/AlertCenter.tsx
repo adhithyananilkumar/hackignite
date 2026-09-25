@@ -40,7 +40,7 @@ export function AlertCenter({
         {alerts.map((alert) => (
           <div
             key={alert.id}
-            className={`cursor-pointer border-t border-[#f1f3f4] px-4 py-2.5 hover:bg-[#f8f9fa] ${alert.acknowledged ? "opacity-60" : ""}`}
+            className={`cursor-pointer border-t border-black/[0.05] px-4 py-2.5 hover:bg-white/60 ${alert.acknowledged ? "opacity-60" : ""}`}
             onClick={() => onSelect({ type: alert.target_type === "dam" ? "dam" : "river", id: alert.target_id })}
           >
             <div className="flex items-center justify-between gap-2">

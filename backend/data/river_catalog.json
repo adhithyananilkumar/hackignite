@@ -1,0 +1,26 @@
+{
+  "note": "Rivers VARUNA models. `osm_names` are matched (case-insensitive, ignoring the word 'river') against OpenStreetMap waterway=river names by scripts/build_rivers.py. `outlet` links the river to the coastal sea-level point it drains through (null for east-flowing rivers). Add a river here, then run build_rivers.py and build_flood_grids.py.",
+  "rivers": [
+    { "id": "periyar",       "name": "Periyar",              "osm_names": ["periyar"],                    "outlet": "kochi",         "featured": true },
+    { "id": "bharathapuzha", "name": "Bharathapuzha (Nila)", "osm_names": ["bharathapuzha"],              "outlet": "ponnani",       "featured": true },
+    { "id": "pamba",         "name": "Pamba",                "osm_names": ["pamba"],                      "outlet": "thottappally",  "featured": true },
+    { "id": "chaliyar",      "name": "Chaliyar",             "osm_names": ["chaliyar"],                   "outlet": "beypore" },
+    { "id": "chalakudy",     "name": "Chalakudy",            "osm_names": ["chalakudy", "chalakkudy"],    "outlet": "azhikode" },
+    { "id": "achankovil",    "name": "Achankovil",           "osm_names": ["achankovil", "achenkovil"],   "outlet": "thottappally" },
+    { "id": "kabini",        "name": "Kabini (Kabani)",      "osm_names": ["kabini"],                     "outlet": null },
+    { "id": "valapattanam",  "name": "Valapattanam",         "osm_names": ["valapattanam"],               "outlet": "azhikkal" },
+    { "id": "meenachil",     "name": "Meenachil",            "osm_names": ["meenachil"],                  "outlet": "kochi" },
+    { "id": "manimala",      "name": "Manimala",             "osm_names": ["manimala"],                   "outlet": "thottappally" },
+    { "id": "muvattupuzha",  "name": "Muvattupuzha",         "osm_names": ["muvattupuzha"],               "outlet": "kochi" },
+    { "id": "kallada",       "name": "Kallada",              "osm_names": ["kallada"],                    "outlet": "neendakara" },
+    { "id": "karamana",      "name": "Karamana",             "osm_names": ["karamana"],                   "outlet": "thiruvananthapuram" },
+    { "id": "neyyar",        "name": "Neyyar",               "osm_names": ["neyyar"],                     "outlet": "thiruvananthapuram" },
+    { "id": "kadalundi",     "name": "Kadalundi",            "osm_names": ["kadalundi"],                  "outlet": "beypore" },
+    { "id": "kuppam",        "name": "Kuppam",               "osm_names": ["kuppam"],                     "outlet": "azhikkal" },
+    { "id": "chandragiri",   "name": "Chandragiri",          "osm_names": ["chandragiri", "payaswini"],   "outlet": "kasaragod" },
+    { "id": "mayyazhi",      "name": "Mayyazhi (Mahe)",      "osm_names": ["mayyazhi puzha", "mahe"],     "outlet": "azhikkal" },
+    { "id": "kariangode",    "name": "Kariangode",           "osm_names": ["kariangode"],                 "outlet": "kasaragod" },
+    { "id": "anjarakandy",   "name": "Anjarakandy",          "osm_names": ["anjarakandy"],                "outlet": "azhikkal" },
+    { "id": "bhavani",       "name": "Bhavani",              "osm_names": ["bhavani"],                    "outlet": null }
+  ]
+}

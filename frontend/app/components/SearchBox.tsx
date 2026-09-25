@@ -127,15 +127,15 @@ export function SearchBox({
   return (
     <div className="relative w-full">
       <div
-        className={`flex h-12 items-center gap-1 bg-white pl-1 pr-3 shadow-[var(--maps-shadow)] ${
-          open && results.length ? "rounded-t-3xl" : "rounded-3xl"
+        className={`maps-glass-strong flex h-12 items-center gap-1 pl-1 pr-3 ${
+          open && results.length ? "!rounded-b-none !rounded-t-3xl" : "!rounded-3xl"
         }`}
       >
         <button
           onClick={onTogglePanel}
           aria-label={panelOpen ? "Hide side panel" : "Show side panel"}
           title={panelOpen ? "Hide side panel" : "Show side panel"}
-          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-white/70"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
             <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
@@ -176,7 +176,7 @@ export function SearchBox({
               setQuery("");
               inputRef.current?.focus();
             }}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-white/70"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
               <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -187,13 +187,13 @@ export function SearchBox({
             <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14" />
           </svg>
         )}
-        <span className="ml-2 border-l border-[#e8eaed] pl-3 text-[13px] font-medium tracking-wide text-[#1a73e8]">VARUNA</span>
+        <span className="ml-2 border-l border-black/[0.07] pl-3 text-[13px] font-medium tracking-wide text-[#1a73e8]">VARUNA</span>
       </div>
 
       {open && results.length > 0 && (
         <ul
           role="listbox"
-          className="absolute left-0 right-0 top-12 z-30 overflow-hidden rounded-b-3xl border-t border-[#e8eaed] bg-white pb-2 shadow-[var(--maps-shadow)]"
+          className="absolute left-0 right-0 top-12 z-30 overflow-hidden maps-glass-strong !rounded-t-none !rounded-b-3xl !border-t-black/[0.06] pb-2"
         >
           {results.map((r, i) => (
             <li
@@ -205,7 +205,7 @@ export function SearchBox({
                 pick(r);
               }}
               onMouseEnter={() => setActive(i)}
-              className={`flex cursor-pointer items-center gap-3 px-4 py-2 ${i === active ? "bg-[#f1f3f4]" : ""}`}
+              className={`flex cursor-pointer items-center gap-3 px-4 py-2 ${i === active ? "bg-white/55" : ""}`}
             >
               <KindIcon kind={r.kind} />
               <div className="min-w-0">

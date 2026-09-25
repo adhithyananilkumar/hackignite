@@ -112,7 +112,7 @@ export default function CommandCenter() {
           <SearchBox onPick={onSearchPick} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen((o) => !o)} />
         </div>
         {panelOpen && (
-          <div className="pointer-events-auto min-h-0 flex-1 overflow-y-auto rounded-xl bg-white shadow-[var(--maps-shadow)] varuna-scrollbar">
+          <div className="pointer-events-auto min-h-0 flex-1 overflow-y-auto maps-glass-strong varuna-scrollbar">
             {selection?.type === "river" ? (
               <RiverPanel
                 riverId={selection.id}

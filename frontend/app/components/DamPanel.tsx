@@ -24,18 +24,18 @@ export function DamPanel({
           <span className="text-[#5f6368]">Current storage</span>
           <span className="font-medium">{reading.storage_pct}%</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-[#e8eaed]">
+        <div className="h-2 overflow-hidden rounded-full bg-black/[0.08]">
           <div className={`h-full risk-${reading.risk}`} style={{ width: `${reading.storage_pct}%` }} />
         </div>
       </Section>
 
       <Section title="Flows">
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg bg-[#f1f3f4] px-3 py-2">
+          <div className="rounded-lg bg-white/55 px-3 py-2">
             <div className="text-lg font-medium tabular-nums">{reading.inflow_m3s.toLocaleString()} m³/s</div>
             <div className="text-xs text-[#5f6368]">Inflow</div>
           </div>
-          <div className="rounded-lg bg-[#f1f3f4] px-3 py-2">
+          <div className="rounded-lg bg-white/55 px-3 py-2">
             <div className="text-lg font-medium tabular-nums">{reading.outflow_m3s.toLocaleString()} m³/s</div>
             <div className="text-xs text-[#5f6368]">Outflow</div>
           </div>

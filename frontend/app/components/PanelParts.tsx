@@ -15,11 +15,11 @@ export function PanelHeader({
   onBack: () => void;
 }) {
   return (
-    <div className="border-b border-[#e8eaed] px-5 pb-4 pt-3">
+    <div className="border-b border-black/[0.07] px-5 pb-4 pt-3">
       <button
         onClick={onBack}
         aria-label="Back to overview"
-        className="-ml-2 mb-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
+        className="-ml-2 mb-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#5f6368] hover:bg-white/70"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
           <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" />
@@ -39,7 +39,7 @@ export function PanelHeader({
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="border-b border-[#e8eaed] px-5 py-4 last:border-b-0">
+    <section className="border-b border-black/[0.07] px-5 py-4 last:border-b-0">
       <h3 className="mb-3 text-[13px] font-medium text-[#202124]">{title}</h3>
       {children}
     </section>

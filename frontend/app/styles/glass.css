@@ -80,10 +80,12 @@
 
 /* ---------- Google-Maps-style light theme for the command center ---------- */
 .maps-ui {
-  --glass-bg: #ffffff;
-  --glass-bg-strong: #ffffff;
-  --glass-border: #dadce0;
-  --glass-highlight: #f1f3f4;
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(60, 64, 67, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.55);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 10px 30px rgba(32, 56, 88, 0.16), 0 1px 3px rgba(32, 56, 88, 0.12);
   --glass-text: #202124;
   --glass-text-dim: #5f6368;
   --accent: #1a73e8;
@@ -98,12 +100,21 @@
   color: var(--glass-text);
 }
 
-.maps-ui .glass-panel {
-  border: none;
-  border-radius: 12px;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: var(--maps-shadow);
+/* Frosted light glass: translucent white, strong blur + saturation so the map
+   tints through, a bright top edge, and a soft diffuse shadow. */
+.maps-ui .glass-panel,
+.maps-glass,
+.maps-glass-strong {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+/* Long-reading surfaces (side panel, search results) need a little more opacity. */
+.maps-glass-strong {
+  background: var(--glass-bg-strong);
 }
 
 .maps-ui .glass-button {
@@ -138,18 +149,21 @@
   height: 32px;
   padding: 0 12px;
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
   color: #3c4043;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  box-shadow: var(--maps-shadow);
+  box-shadow: var(--glass-shadow);
   cursor: pointer;
   transition: background 120ms ease;
 }
-.maps-chip:hover { background: #f8f9fa; }
+.maps-chip:hover { background: rgba(255, 255, 255, 0.8); }
 .maps-chip[aria-pressed="true"] {
-  background: var(--accent-soft);
+  background: rgba(232, 240, 254, 0.78);
   color: #1967d2;
 }
 

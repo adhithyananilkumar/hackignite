@@ -44,7 +44,7 @@ export function AIAssistant() {
               <button
                 key={s}
                 onClick={() => send(s)}
-                className="cursor-pointer rounded-full border border-[#dadce0] px-3 py-1 text-left text-xs text-[#3c4043] hover:bg-[#f1f3f4]"
+                className="cursor-pointer rounded-full border border-[#dadce0] px-3 py-1 text-left text-xs text-[#3c4043] hover:bg-white/70"
               >
                 {s}
               </button>
@@ -55,7 +55,7 @@ export function AIAssistant() {
           <div
             key={i}
             className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${
-              t.role === "user" ? "self-end bg-[#e8f0fe] text-[#174ea6]" : "self-start bg-[#f1f3f4] text-[#202124]"
+              t.role === "user" ? "self-end bg-[#e8f0fe] text-[#174ea6]" : "self-start bg-white/55 text-[#202124]"
             }`}
           >
             {t.text}
@@ -74,7 +74,7 @@ export function AIAssistant() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Which areas may be affected in 6h?"
-          className="flex-1 rounded-full bg-[#f1f3f4] px-4 py-2 text-sm text-[#202124] outline-none placeholder:text-[#70757a] focus:bg-white focus:ring-2 focus:ring-[#1a73e8]"
+          className="flex-1 rounded-full bg-white/55 px-4 py-2 text-sm text-[#202124] outline-none placeholder:text-[#70757a] focus:bg-white focus:ring-2 focus:ring-[#1a73e8]"
         />
         <button
           type="submit"
