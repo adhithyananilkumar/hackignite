@@ -1,0 +1,19 @@
+{
+  "note": "Landslide-prone sites in Kerala's Western Ghats with recent major events. Coordinates are approximate (village level). Each has one monitoring node slot (geophone + tiltmeter + piezometer); nodes are simulated until real telemetry is connected.",
+  "thresholds": {
+    "note": "Indicative rainfall triggers for the Western Ghats; replace with GSI / KSDMA site thresholds.",
+    "rain_24h_mm": { "watch": 60, "alert": 115, "warning": 200 },
+    "rain_72h_mm": { "watch": 150, "alert": 250, "warning": 400 },
+    "soil_saturation": { "alert": 0.40 }
+  },
+  "hotspots": [
+    { "id": "mundakkai",   "name": "Mundakkai–Chooralmala", "district": "Wayanad",    "coordinates": [76.145, 11.475], "history": "Debris flow, July 2024" },
+    { "id": "puthumala",   "name": "Puthumala",             "district": "Wayanad",    "coordinates": [76.180, 11.505], "history": "Landslide, August 2019" },
+    { "id": "kavalappara", "name": "Kavalappara",           "district": "Malappuram", "coordinates": [76.335, 11.375], "history": "Landslide, August 2019" },
+    { "id": "pettimudi",   "name": "Pettimudi (Munnar)",    "district": "Idukki",     "coordinates": [77.030, 10.160], "history": "Landslide, August 2020" },
+    { "id": "kokkayar",    "name": "Kokkayar",              "district": "Idukki",     "coordinates": [76.880, 9.575],  "history": "Landslide, October 2021" },
+    { "id": "koottickal",  "name": "Koottickal",            "district": "Kottayam",   "coordinates": [76.845, 9.600],  "history": "Landslide, October 2021" },
+    { "id": "kudayathoor", "name": "Kudayathoor",           "district": "Idukki",     "coordinates": [76.810, 9.890],  "history": "Landslide, August 2022" },
+    { "id": "nilambur",    "name": "Nilambur hills",        "district": "Malappuram", "coordinates": [76.300, 11.330], "history": "Multiple slides, 2018–2019" }
+  ]
+}

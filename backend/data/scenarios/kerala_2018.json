@@ -63,5 +63,9 @@
   "coast": {
     "surge_m": 0.45,
     "note": "Monsoon wind set-up / surge added to the live Copernicus tide in this scenario."
+  },
+  "landslide": {
+    "rain_72h_mm": 420,
+    "note": "Scripted hill rainfall added to live values at landslide hotspots."
   }
 }

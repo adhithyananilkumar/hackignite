@@ -309,6 +309,41 @@ export interface ChatUiContext {
   selection?: { type: "river" | "dam"; id: string } | null;
 }
 
+export type LandslideLevel = "GREEN" | "YELLOW" | "ORANGE" | "RED";
+
+export interface LandslideSite {
+  id: string;
+  name: string;
+  district: string;
+  coordinates: [number, number];
+  history: string;
+  level: LandslideLevel;
+  outlook_level: LandslideLevel;
+  message: string;
+  rain_24h_mm: number;
+  rain_72h_mm: number;
+  rain_next_24h_mm: number;
+  soil_moisture: number;
+  node: {
+    status: string;
+    vibration_events_per_h: number;
+    tilt_deg_per_day: number;
+    pore_pressure_kpa: number;
+    anomaly: boolean;
+  };
+}
+
+export interface LandslideSnapshot {
+  generated_at: string;
+  rain_source: string;
+  sensor_source: string;
+  thresholds: {
+    rain_24h_mm: { watch: number; alert: number; warning: number };
+    rain_72h_mm: { watch: number; alert: number; warning: number };
+  };
+  sites: LandslideSite[];
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
@@ -349,6 +384,7 @@ export const api = {
   damFlow: (damId: string) => getJson<FlowOutlook>(`/flow/dams/${damId}`),
   reservoirOutlook: (damId: string) => getJson<ReservoirOutlook>(`/reservoirs/${damId}/outlook`),
   coastal: () => getJson<CoastalSnapshot>("/coastal"),
+  landslide: () => getJson<LandslideSnapshot>("/landslide"),
   sources: () => getJson<SourcesState>("/sources"),
   setSourceMode: (mode: SourceMode) => postJson<SourcesState>("/sources/mode", { mode }),
   controlSimulation: (body: { scenario_id?: string; action?: "play" | "pause" | "restart"; speed?: number }) =>

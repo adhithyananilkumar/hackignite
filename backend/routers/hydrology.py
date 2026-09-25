@@ -4,6 +4,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 
 from services.coastal import coastal
+from services.landslide import landslide
 from services.glofas import glofas, load_calibrations
 from services.reservoirs import reservoirs
 from services.sources.base import DATA_DIR
@@ -62,5 +63,13 @@ async def reservoir_outlook(dam_id: str):
 async def coastal_sea_level():
     try:
         return await coastal.snapshot()
+    except httpx.HTTPError as exc:
+        raise _upstream_unavailable(exc) from None
+
+
+@router.get("/landslide")
+async def landslide_warning():
+    try:
+        return await landslide.snapshot()
     except httpx.HTTPError as exc:
         raise _upstream_unavailable(exc) from None

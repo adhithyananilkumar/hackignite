@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCenter } from "../components/AlertCenter";
 import { ChatPanel } from "../components/ChatPanel";
 import { CoastalWidget } from "../components/CoastalWidget";
+import { LandslideWidget, useLandslide } from "../components/LandslideWidget";
 import { DamPanel } from "../components/DamPanel";
 import { DataSourceSwitcher } from "../components/DataSourceSwitcher";
 import { FloodTimeline } from "../components/FloodTimeline";
@@ -34,6 +35,7 @@ export default function CommandCenter() {
   const { snapshot, connected } = useLiveData();
   const flood = useFloodForecast(snapshot?.mode);
   const coastal = useCoastal(snapshot?.mode);
+  const landslide = useLandslide(snapshot?.mode);
   const [rivers, setRivers] = useState<PlaceMeta>({});
   const [dams, setDams] = useState<PlaceMeta>({});
   const [selection, setSelection] = useState<MapSelection>(null);
@@ -246,9 +248,10 @@ export default function CommandCenter() {
       </div>
 
       {/* Right: data source + alerts */}
-      <div className="absolute right-3 top-3 z-10 flex flex-col gap-3">
+      <div className="varuna-scrollbar absolute bottom-3 right-3 top-3 z-10 flex flex-col gap-3 overflow-y-auto pb-1">
         <DataSourceSwitcher snapshot={snapshot} connected={connected} />
         <AlertCenter names={names} onSelect={select} />
+        <LandslideWidget data={landslide} onFocus={flyTo} />
         <CoastalWidget data={coastal} />
       </div>
 
