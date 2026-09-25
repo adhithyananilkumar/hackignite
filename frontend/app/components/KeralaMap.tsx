@@ -38,27 +38,47 @@ function loadMapLibre(): Promise<typeof maplibregl> {
   return maplibreLoadPromise;
 }
 
+// A river at NORMAL is drawn as water blue; anything above it takes the
+// status colour, so on a light map only rivers at risk stand out.
 const RISK_COLORS: Record<string, string> = {
-  NORMAL: "#3ddc84",
-  WATCH: "#f4d35e",
-  ADVISORY: "#f5a623",
-  HIGH: "#f0623a",
-  CRITICAL: "#ff3b3b",
+  NORMAL: "#4285f4",
+  WATCH: "#f9ab00",
+  ADVISORY: "#fa7b17",
+  HIGH: "#e8453c",
+  CRITICAL: "#c5221f",
 };
 
 const IMPACT_COLORS: Record<string, string> = {
-  hospital: "#ff6b6b",
-  school: "#ffd166",
-  shelter: "#35c2f0",
-  bridge: "#b9c4cc",
+  hospital: "#d93025",
+  school: "#e37400",
+  shelter: "#1a73e8",
+  bridge: "#5f6368",
 };
 
-const DEEP_WATER = "#03060b";
+// Google-Maps-like basemap: CARTO Voyager (key-free) with water recoloured.
+const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+const WATER_COLOR = "#aadaff";
+const OUTSIDE_KERALA = "#eef0f2";
+const SATELLITE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const TERRAIN_DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
-const ROUTE_HIGHLIGHT_COLOR = "#9fe9ff";
+const ROUTE_HIGHLIGHT_COLOR = "#1a73e8";
+const LABEL_TEXT = "#3c4043";
 
 export type MapSelection = { type: "river" | "dam"; id: string } | null;
 export type MapFocus = { lon: number; lat: number; key: string } | null;
+export type Basemap = "map" | "satellite";
+export type AssetType = "hospital" | "school" | "shelter" | "bridge";
+export type LayerToggles = { flood: boolean } & Record<AssetType, boolean>;
+export const DEFAULT_LAYERS: LayerToggles = { flood: true, hospital: true, school: true, shelter: true, bridge: true };
+const ASSET_TYPES: AssetType[] = ["hospital", "school", "shelter", "bridge"];
+const ASSET_LAYERS = ["impact-points", "exposed-halo", "exposed-points", "exposed-label"];
+
+type Expr = maplibregl.ExpressionSpecification;
+const RIVER_COLOR_EXPR = ["coalesce", ["get", "color"], RISK_COLORS.NORMAL] as unknown as Expr;
+// Only rivers above NORMAL glow; a calm river is just a blue line.
+const RIVER_GLOW_OPACITY_EXPR = ["case", ["==", ["coalesce", ["get", "risk"], "NORMAL"], "NORMAL"], 0, 0.3] as unknown as Expr;
+const RIVER_WIDTH_EXPR = ["interpolate", ["linear"], ["zoom"], 6, 2, 10, 3.2, 14, 5] as unknown as Expr;
+const RIVER_CASING_WIDTH_EXPR = ["interpolate", ["linear"], ["zoom"], 6, 4.5, 10, 6.5, 14, 9] as unknown as Expr;
 
 const ASSET_LABELS: Record<string, string> = {
   hospital: "Hospital",
@@ -118,8 +138,9 @@ function bearingBetween([lon1, lat1]: [number, number], [lon2, lat2]: [number, n
   return (Math.atan2(y, x) * toDeg + 360) % 360;
 }
 
-// A world rectangle with the Kerala outline punched out as a hole: filled in
-// deep black, this hides every other state/country so only Kerala shows.
+// A world rectangle with the Kerala outline punched out as a hole. It's drawn
+// beneath the basemap's water, so neighbouring land is washed out while the
+// Arabian Sea stays blue.
 function buildMask(keralaOuterRing: [number, number][]) {
   const world: [number, number][] = [
     [-179.9, -85],
@@ -144,6 +165,9 @@ export function KeralaMap({
   flood = null,
   horizonIndex = 0,
   focus = null,
+  basemap = "map",
+  layers = DEFAULT_LAYERS,
+  padding = { top: 80, bottom: 160, left: 60, right: 60 },
   onSelectRiver,
   onSelectDam,
   onDeselect,
@@ -153,6 +177,10 @@ export function KeralaMap({
   flood?: FloodForecast | null;
   horizonIndex?: number;
   focus?: MapFocus;
+  basemap?: Basemap;
+  layers?: LayerToggles;
+  /** Screen space covered by floating UI, kept clear when framing Kerala or a river. */
+  padding?: { top: number; bottom: number; left: number; right: number };
   onSelectRiver?: (id: string) => void;
   onSelectDam?: (id: string) => void;
   onDeselect?: () => void;
@@ -174,6 +202,39 @@ export function KeralaMap({
   const horizonRef = useRef(horizonIndex);
   const floodUrlsRef = useRef<Record<string, string>>({});
   const mapReadyRef = useRef(false);
+  const paddingRef = useRef(padding);
+  const basemapRef = useRef<Basemap>(basemap);
+  const layersRef = useRef<LayerToggles>(layers);
+
+  useEffect(() => {
+    paddingRef.current = padding;
+  }, [padding]);
+
+  useEffect(() => {
+    basemapRef.current = basemap;
+    layersRef.current = layers;
+    applyDisplayOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basemap, layers]);
+
+  // Basemap (map vs satellite) and layer chips: visibility/filters only, no rebuild.
+  function applyDisplayOptions() {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current) return;
+    const satellite = basemapRef.current === "satellite";
+    map.setLayoutProperty("satellite", "visibility", satellite ? "visible" : "none");
+    map.setLayoutProperty("hillshade", "visibility", satellite ? "none" : "visible");
+    map.setPaintProperty("kerala-outline-line", "line-color", satellite ? "#ffffff" : "#5f6368");
+    map.setPaintProperty("kerala-outline-casing", "line-opacity", satellite ? 0 : 0.9);
+
+    const enabled = ASSET_TYPES.filter((t) => layersRef.current[t]);
+    const assetFilter = ["in", ["get", "type"], ["literal", enabled]] as unknown as maplibregl.FilterSpecification;
+    for (const id of ASSET_LAYERS) map.setFilter(id, assetFilter);
+
+    for (const id of Object.keys(floodUrlsRef.current)) {
+      map.setLayoutProperty(id, "visibility", layersRef.current.flood ? "visible" : "none");
+    }
+  }
 
   useEffect(() => {
     floodRef.current = flood;
@@ -205,7 +266,13 @@ export function KeralaMap({
       if (!map.getSource(id)) {
         map.addSource(id, { type: "raster", tiles: [url], tileSize: 256, minzoom: 5, maxzoom: FLOOD_TILE_MAXZOOM });
         map.addLayer(
-          { id, type: "raster", source: id, paint: { "raster-opacity": 0, "raster-fade-duration": 200 } },
+          {
+            id,
+            type: "raster",
+            source: id,
+            layout: { visibility: layersRef.current.flood ? "visible" : "none" },
+            paint: { "raster-opacity": 0, "raster-fade-duration": 200 },
+          },
           "rivers-glow"
         );
         map.setPaintProperty(id, "raster-opacity-transition", { duration: FLOOD_CROSSFADE_MS, delay: 0 });
@@ -269,7 +336,7 @@ export function KeralaMap({
           [maxLng, maxLat],
         ],
         {
-          padding: { top: 140, bottom: 180, left: 320, right: 340 },
+          padding: paddingRef.current,
           pitch: 66,
           bearing,
           duration: 1800,
@@ -296,49 +363,43 @@ export function KeralaMap({
 
   function highlightRiver(map: maplibregl.Map, id: string) {
     const isSelected = ["==", ["get", "id"], id];
-    map.setPaintProperty("rivers-line", "line-opacity", ["case", isSelected, 1, 0.12]);
-    map.setPaintProperty("rivers-line", "line-width", ["case", isSelected, 4.4, 2]);
-    map.setPaintProperty("rivers-glow", "line-color", [
-      "case",
-      isSelected,
-      ROUTE_HIGHLIGHT_COLOR,
-      ["coalesce", ["get", "color"], "#35c2f0"],
-    ]);
-    map.setPaintProperty("rivers-glow", "line-opacity", ["case", isSelected, 0.85, 0.05]);
-    map.setPaintProperty("rivers-glow", "line-width", ["case", isSelected, 17, 9]);
-    map.setPaintProperty("dams-circle", "circle-opacity", 0.3);
-    map.setPaintProperty("dams-glow", "circle-opacity", 0.1);
-    map.setPaintProperty("dams-label", "text-opacity", 0.3);
+    map.setPaintProperty("rivers-line", "line-opacity", ["case", isSelected, 1, 0.3]);
+    map.setPaintProperty("rivers-line", "line-width", ["case", isSelected, 5, 2]);
+    map.setPaintProperty("rivers-casing", "line-width", ["case", isSelected, 9, 5]);
+    map.setPaintProperty("rivers-glow", "line-color", ["case", isSelected, ROUTE_HIGHLIGHT_COLOR, RIVER_COLOR_EXPR]);
+    map.setPaintProperty("rivers-glow", "line-opacity", ["case", isSelected, 0.35, 0]);
+    map.setPaintProperty("rivers-glow", "line-width", ["case", isSelected, 18, 10]);
+    map.setPaintProperty("dams-circle", "circle-opacity", 0.4);
+    map.setPaintProperty("dams-circle", "circle-stroke-opacity", 0.4);
+    map.setPaintProperty("dams-label", "text-opacity", 0.4);
   }
 
   function highlightDam(map: maplibregl.Map, id: string) {
     const isSelected = ["==", ["get", "id"], id];
-    map.setPaintProperty("dams-circle", "circle-opacity", ["case", isSelected, 1, 0.25]);
-    map.setPaintProperty("dams-circle", "circle-radius", ["case", isSelected, 9, 6]);
-    map.setPaintProperty("dams-glow", "circle-color", [
-      "case",
-      isSelected,
-      ROUTE_HIGHLIGHT_COLOR,
-      ["coalesce", ["get", "color"], "#35c2f0"],
-    ]);
-    map.setPaintProperty("dams-glow", "circle-opacity", ["case", isSelected, 0.6, 0.08]);
-    map.setPaintProperty("dams-glow", "circle-radius", ["case", isSelected, 24, 14]);
-    map.setPaintProperty("dams-label", "text-opacity", ["case", isSelected, 1, 0.3]);
-    map.setPaintProperty("rivers-line", "line-opacity", 0.3);
-    map.setPaintProperty("rivers-glow", "line-opacity", 0.08);
+    map.setPaintProperty("dams-circle", "circle-opacity", ["case", isSelected, 1, 0.35]);
+    map.setPaintProperty("dams-circle", "circle-stroke-opacity", ["case", isSelected, 1, 0.35]);
+    map.setPaintProperty("dams-circle", "circle-radius", ["case", isSelected, 10, 6.5]);
+    map.setPaintProperty("dams-glow", "circle-color", ["case", isSelected, ROUTE_HIGHLIGHT_COLOR, "#000000"]);
+    map.setPaintProperty("dams-glow", "circle-opacity", ["case", isSelected, 0.3, 0.06]);
+    map.setPaintProperty("dams-glow", "circle-radius", ["case", isSelected, 24, 11]);
+    map.setPaintProperty("dams-label", "text-opacity", ["case", isSelected, 1, 0.35]);
+    map.setPaintProperty("rivers-line", "line-opacity", 0.45);
+    map.setPaintProperty("rivers-glow", "line-opacity", 0);
   }
 
   function resetHighlight(map: maplibregl.Map) {
-    map.setPaintProperty("rivers-line", "line-opacity", 0.95);
-    map.setPaintProperty("rivers-line", "line-width", 2.6);
-    map.setPaintProperty("rivers-glow", "line-color", ["coalesce", ["get", "color"], "#35c2f0"]);
-    map.setPaintProperty("rivers-glow", "line-opacity", 0.45);
-    map.setPaintProperty("rivers-glow", "line-width", 9);
+    map.setPaintProperty("rivers-line", "line-opacity", 1);
+    map.setPaintProperty("rivers-line", "line-width", RIVER_WIDTH_EXPR);
+    map.setPaintProperty("rivers-casing", "line-width", RIVER_CASING_WIDTH_EXPR);
+    map.setPaintProperty("rivers-glow", "line-color", RIVER_COLOR_EXPR);
+    map.setPaintProperty("rivers-glow", "line-opacity", RIVER_GLOW_OPACITY_EXPR);
+    map.setPaintProperty("rivers-glow", "line-width", 12);
     map.setPaintProperty("dams-circle", "circle-opacity", 1);
-    map.setPaintProperty("dams-circle", "circle-radius", 6);
-    map.setPaintProperty("dams-glow", "circle-color", ["coalesce", ["get", "color"], "#35c2f0"]);
-    map.setPaintProperty("dams-glow", "circle-opacity", 0.35);
-    map.setPaintProperty("dams-glow", "circle-radius", 14);
+    map.setPaintProperty("dams-circle", "circle-stroke-opacity", 1);
+    map.setPaintProperty("dams-circle", "circle-radius", 6.5);
+    map.setPaintProperty("dams-glow", "circle-color", "#000000");
+    map.setPaintProperty("dams-glow", "circle-opacity", 0.18);
+    map.setPaintProperty("dams-glow", "circle-radius", 11);
     map.setPaintProperty("dams-label", "text-opacity", 1);
   }
 
@@ -368,20 +429,29 @@ export function KeralaMap({
     (map.getSource("dams") as maplibregl.GeoJSONSource | undefined)?.setData(damData);
   }
 
-  // Any style layer whose own id/source hints at open water gets recolored to a
-  // near-black "deep sea" tone instead of the basemap's default blue.
-  function blackenWater(map: maplibregl.Map) {
+  // Recolour the basemap's water to Google-Maps blue and return the id of the
+  // first water layer, so the outside-Kerala wash can sit beneath it.
+  function styleWater(map: maplibregl.Map): string | undefined {
+    let firstWater: string | undefined;
     for (const layer of map.getStyle().layers ?? []) {
       const id = layer.id.toLowerCase();
       if (!id.includes("water") && !id.includes("ocean")) continue;
-      try {
-        if (layer.type === "fill") map.setPaintProperty(layer.id, "fill-color", DEEP_WATER);
-        if (layer.type === "background") map.setPaintProperty(layer.id, "background-color", DEEP_WATER);
-        if (layer.type === "line") map.setPaintProperty(layer.id, "line-color", DEEP_WATER);
-      } catch {
-        // Style-dependent; skip layers that don't support the property.
+      if (layer.type === "fill") {
+        map.setPaintProperty(layer.id, "fill-color", WATER_COLOR);
+        firstWater ??= layer.id;
+      } else if (layer.type === "line" && !id.includes("label")) {
+        map.setPaintProperty(layer.id, "line-color", "#8ec9f5");
       }
     }
+    return firstWater;
+  }
+
+  // Satellite imagery slots in above land/water fills but below roads and
+  // labels, giving a Google-style "hybrid" view.
+  function firstRoadOrLabelLayer(map: maplibregl.Map): string | undefined {
+    return (map.getStyle().layers ?? []).find(
+      (l) => l.type === "symbol" || (l.type === "line" && !/water|boundary|admin/i.test(l.id))
+    )?.id;
   }
 
   useEffect(() => {
@@ -393,10 +463,10 @@ export function KeralaMap({
       if (!containerRef.current) return;
       const map = new gl.Map({
         container: containerRef.current,
-        style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+        style: BASEMAP_STYLE,
         center: [76.4, 10.3],
         zoom: 6.6,
-        pitch: 52,
+        pitch: 40,
         bearing: -12,
         minZoom: 6,
         maxZoom: 14,
@@ -423,7 +493,8 @@ export function KeralaMap({
 
       map.on("load", async () => {
         map.resize();
-        blackenWater(map);
+        const firstWaterLayer = styleWater(map);
+        const satelliteBefore = firstRoadOrLabelLayer(map);
 
         let boundary: any, rivers: any, dams: any, impact: any;
         try {
@@ -447,56 +518,77 @@ export function KeralaMap({
           encoding: "terrarium",
           maxzoom: 14,
         });
-        map.setTerrain({ source: "terrain-dem", exaggeration: 1.4 });
-        map.addLayer({
-          id: "hillshade",
-          type: "hillshade",
-          source: "terrain-dem",
-          paint: {
-            "hillshade-shadow-color": "#000814",
-            "hillshade-highlight-color": "#3a4a52",
-            "hillshade-accent-color": "#0a0e12",
-            "hillshade-exaggeration": 0.55,
-          },
+        map.setTerrain({ source: "terrain-dem", exaggeration: 1.3 });
+
+        // --- Satellite ("hybrid") imagery, hidden until the Layers toggle asks ---
+        map.addSource("satellite", {
+          type: "raster",
+          tiles: [SATELLITE_TILES],
+          tileSize: 256,
+          maxzoom: 18,
+          attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
         });
+        map.addLayer(
+          { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
+          satelliteBefore
+        );
+
+        // Soft relief, like Google's terrain shading: shadows, no dark wash.
+        map.addLayer(
+          {
+            id: "hillshade",
+            type: "hillshade",
+            source: "terrain-dem",
+            paint: {
+              "hillshade-shadow-color": "#6d7b86",
+              "hillshade-highlight-color": "#ffffff",
+              "hillshade-accent-color": "#8a98a3",
+              "hillshade-exaggeration": 0.35,
+            },
+          },
+          satelliteBefore
+        );
         if (typeof (map as any).setSky === "function") {
           try {
             (map as any).setSky({
-              "sky-color": "#0a1620",
-              "horizon-color": "#111c26",
-              "fog-color": "#0a1620",
-              "fog-ground-blend": 0.5,
-              "horizon-fog-blend": 0.6,
-              "sky-horizon-blend": 0.8,
-              "atmosphere-blend": 0.7,
+              "sky-color": "#bcdcff",
+              "horizon-color": "#f2f7fc",
+              "fog-color": "#ffffff",
+              "fog-ground-blend": 0.6,
+              "horizon-fog-blend": 0.5,
+              "sky-horizon-blend": 0.6,
+              "atmosphere-blend": 0.4,
             });
           } catch {
             // Sky layer isn't supported by every style/runtime combination.
           }
         }
 
-        // --- Kerala-only mask: black out the rest of the world ---
+        // --- Fade everything outside Kerala; drawn under the water so the sea stays blue ---
         const outerRing = boundary.features[0].geometry.coordinates[0] as [number, number][];
         map.addSource("kerala-mask", { type: "geojson", data: buildMask(outerRing) });
-        map.addLayer({
-          id: "kerala-mask-fill",
-          type: "fill",
-          source: "kerala-mask",
-          paint: { "fill-color": "#01040a", "fill-opacity": 1 },
-        });
+        map.addLayer(
+          {
+            id: "kerala-mask-fill",
+            type: "fill",
+            source: "kerala-mask",
+            paint: { "fill-color": OUTSIDE_KERALA, "fill-opacity": 0.78 },
+          },
+          firstWaterLayer
+        );
 
         map.addSource("kerala-outline", { type: "geojson", data: boundary });
         map.addLayer({
-          id: "kerala-outline-glow",
+          id: "kerala-outline-casing",
           type: "line",
           source: "kerala-outline",
-          paint: { "line-color": "#35c2f0", "line-width": 6, "line-blur": 6, "line-opacity": 0.35 },
+          paint: { "line-color": "#ffffff", "line-width": 4, "line-opacity": 0.9 },
         });
         map.addLayer({
           id: "kerala-outline-line",
           type: "line",
           source: "kerala-outline",
-          paint: { "line-color": "#7fd8f7", "line-width": 1.4, "line-opacity": 0.8 },
+          paint: { "line-color": "#5f6368", "line-width": 1.5, "line-dasharray": [3, 2] },
         });
 
         // --- Impact points (hospitals / schools / shelters / bridges) ---
@@ -518,12 +610,12 @@ export function KeralaMap({
               "#b9c4cc",
             ],
             "circle-stroke-width": 1,
-            "circle-stroke-color": "#04070c",
-            "circle-opacity": 0.55,
+            "circle-stroke-color": "#ffffff",
+            "circle-opacity": 0.7,
           },
         });
 
-        // --- Rivers: soft glow layer + crisp line on top ---
+        // --- Rivers: risk halo, white casing, coloured line (Google road styling) ---
         map.addSource("rivers", { type: "geojson", data: riversRef.current });
         map.addLayer({
           id: "rivers-glow",
@@ -531,11 +623,18 @@ export function KeralaMap({
           source: "rivers",
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": ["coalesce", ["get", "color"], "#35c2f0"],
-            "line-width": 9,
+            "line-color": RIVER_COLOR_EXPR,
+            "line-width": 12,
             "line-blur": 5,
-            "line-opacity": 0.45,
+            "line-opacity": RIVER_GLOW_OPACITY_EXPR,
           },
+        });
+        map.addLayer({
+          id: "rivers-casing",
+          type: "line",
+          source: "rivers",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#ffffff", "line-width": RIVER_CASING_WIDTH_EXPR, "line-opacity": 0.9 },
         });
         map.addLayer({
           id: "rivers-line",
@@ -543,9 +642,9 @@ export function KeralaMap({
           source: "rivers",
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": ["coalesce", ["get", "color"], "#35c2f0"],
-            "line-width": 2.6,
-            "line-opacity": 0.95,
+            "line-color": RIVER_COLOR_EXPR,
+            "line-width": RIVER_WIDTH_EXPR,
+            "line-opacity": 1,
           },
         });
         map.addLayer({
@@ -556,9 +655,9 @@ export function KeralaMap({
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
             "line-color": ROUTE_HIGHLIGHT_COLOR,
-            "line-width": 7,
+            "line-width": 10,
             "line-blur": 2,
-            "line-opacity": 0.55,
+            "line-opacity": 0.3,
           },
         });
         // Near-invisible wide stroke: the visible river is ~2.6px, far too thin
@@ -589,10 +688,10 @@ export function KeralaMap({
           type: "circle",
           source: "exposed",
           paint: {
-            "circle-radius": assetSize(13, 9),
+            "circle-radius": assetSize(12, 9),
             "circle-color": assetColor,
-            "circle-blur": 1,
-            "circle-opacity": 0.45,
+            "circle-blur": 0.9,
+            "circle-opacity": 0.3,
           },
         });
         map.addLayer({
@@ -600,9 +699,9 @@ export function KeralaMap({
           type: "circle",
           source: "exposed",
           paint: {
-            "circle-radius": assetSize(5.5, 4),
+            "circle-radius": assetSize(6, 4.5),
             "circle-color": assetColor,
-            "circle-stroke-width": 1.5,
+            "circle-stroke-width": 2,
             "circle-stroke-color": "#ffffff",
           },
         });
@@ -619,7 +718,7 @@ export function KeralaMap({
             "text-optional": true,
             "text-font": ["Noto Sans Regular"],
           },
-          paint: { "text-color": "#eaf2f6", "text-halo-color": "#04070c", "text-halo-width": 1.2 },
+          paint: { "text-color": LABEL_TEXT, "text-halo-color": "#ffffff", "text-halo-width": 1.5 },
         });
 
         // --- Dams ---
@@ -628,11 +727,13 @@ export function KeralaMap({
           id: "dams-glow",
           type: "circle",
           source: "dams",
+          // Soft drop shadow under the marker, like a Google pin.
           paint: {
-            "circle-radius": 14,
-            "circle-color": ["coalesce", ["get", "color"], "#35c2f0"],
+            "circle-radius": 11,
+            "circle-color": "#000000",
             "circle-blur": 1,
-            "circle-opacity": 0.35,
+            "circle-opacity": 0.18,
+            "circle-translate": [0, 1.5],
           },
         });
         map.addLayer({
@@ -640,10 +741,10 @@ export function KeralaMap({
           type: "circle",
           source: "dams",
           paint: {
-            "circle-radius": 6,
-            "circle-color": ["coalesce", ["get", "color"], "#35c2f0"],
-            "circle-stroke-width": 2,
-            "circle-stroke-color": "#04070c",
+            "circle-radius": 6.5,
+            "circle-color": ["match", ["coalesce", ["get", "risk"], "NORMAL"], "NORMAL", "#1a73e8", ["get", "color"]],
+            "circle-stroke-width": 2.5,
+            "circle-stroke-color": "#ffffff",
           },
         });
         map.addLayer({
@@ -658,15 +759,15 @@ export function KeralaMap({
           source: "dams",
           layout: {
             "text-field": ["get", "name"],
-            "text-size": 11,
+            "text-size": 11.5,
             "text-offset": [0, 1.2],
             "text-anchor": "top",
             "text-font": ["Noto Sans Regular"],
           },
           paint: {
-            "text-color": "#eaf2f6",
-            "text-halo-color": "#04070c",
-            "text-halo-width": 1.2,
+            "text-color": "#1967d2",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 1.6,
           },
         });
 
@@ -677,9 +778,9 @@ export function KeralaMap({
             [minLng, minLat],
             [maxLng, maxLat],
           ],
-          { padding: 40, duration: 0 }
+          { padding: paddingRef.current, duration: 0 }
         );
-        const pad = 1.1;
+        const pad = 2;
         map.setMaxBounds([
           [minLng - pad, minLat - pad],
           [maxLng + pad, maxLat + pad],
@@ -776,6 +877,7 @@ export function KeralaMap({
         applySnapshotColors();
         mapReadyRef.current = true;
         syncFlood();
+        applyDisplayOptions();
       });
     }
 
@@ -804,7 +906,7 @@ export function KeralaMap({
   const is3D = pitch > 5;
   const zoomBy = (delta: number) => mapRef.current?.easeTo({ zoom: mapRef.current.getZoom() + delta, duration: 300 });
   const resetNorth = () => mapRef.current?.easeTo({ bearing: 0, duration: 500 });
-  const toggle3D = () => mapRef.current?.easeTo({ pitch: is3D ? 0 : 60, duration: 600 });
+  const toggle3D = () => mapRef.current?.easeTo({ pitch: is3D ? 0 : 55, duration: 600 });
   const resetView = () => {
     const overview = overviewRef.current;
     if (overview) mapRef.current?.flyTo({ ...overview, duration: 1400, essential: true });
@@ -817,46 +919,53 @@ export function KeralaMap({
 
       {hover && (
         <div
-          className="pointer-events-none absolute z-20 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] px-2.5 py-1.5 text-xs text-[var(--glass-text)] shadow-lg backdrop-blur-md"
+          className="pointer-events-none absolute z-20 max-w-[260px] rounded-lg bg-white px-3 py-2 text-[13px] text-[#202124] shadow-[var(--maps-shadow)]"
           style={{ left: hover.x + 14, top: hover.y + 14 }}
         >
-          <span className="mr-1.5 text-[10px] uppercase tracking-wider text-[var(--glass-text-dim)]">{hover.label}</span>
-          <span className="font-semibold">{hover.name}</span>
-          <div className="mt-0.5 text-[10px] text-[var(--glass-text-dim)]">{hover.detail}</div>
+          <div className="font-medium leading-tight">{hover.name}</div>
+          <div className="mt-0.5 text-xs text-[#5f6368]">
+            {hover.label} · {hover.detail}
+          </div>
         </div>
       )}
 
-      <div className="absolute bottom-10 right-4 z-20 flex flex-col items-center gap-2">
-        <MapButton title="Reset view" onClick={resetView}>
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+      <div className="absolute bottom-8 right-4 z-20 flex flex-col items-center gap-2.5">
+        <MapButton title="Show all of Kerala" onClick={resetView}>
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3.5" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
           </svg>
         </MapButton>
         <MapButton title={is3D ? "Switch to 2D" : "Switch to 3D"} onClick={toggle3D}>
-          <span className="text-[11px] font-bold">{is3D ? "2D" : "3D"}</span>
+          <span className="text-[13px] font-medium">{is3D ? "2D" : "3D"}</span>
         </MapButton>
         <MapButton title="Reset north (right-drag to rotate/tilt)" onClick={resetNorth}>
-          <svg viewBox="0 0 24 24" className="h-5 w-5" style={{ transform: `rotate(${-bearing}deg)`, transition: "transform 80ms linear" }}>
-            <path d="M12 3l3.5 9h-7z" fill="#ff5a5a" />
-            <path d="M12 21l-3.5-9h7z" fill="currentColor" opacity="0.6" />
+          <svg viewBox="0 0 24 24" className="h-6 w-6" style={{ transform: `rotate(${-bearing}deg)`, transition: "transform 80ms linear" }}>
+            <path d="M12 3l3.5 9h-7z" fill="#ea4335" />
+            <path d="M12 21l-3.5-9h7z" fill="#9aa0a6" />
           </svg>
         </MapButton>
-        <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] backdrop-blur-md shadow-lg">
+        <div className="flex flex-col overflow-hidden rounded-lg bg-white shadow-[var(--maps-shadow)]">
           <button
             title="Zoom in"
+            aria-label="Zoom in"
             onClick={() => zoomBy(1)}
-            className="flex h-10 w-10 cursor-pointer items-center justify-center text-lg text-[var(--glass-text)] hover:bg-[var(--glass-highlight)]"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center text-[#5f6368] hover:bg-[#f1f3f4] hover:text-[#202124]"
           >
-            +
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z" />
+            </svg>
           </button>
-          <div className="mx-2 h-px bg-[var(--glass-border)]" />
+          <div className="mx-2 h-px bg-[#e8eaed]" />
           <button
             title="Zoom out"
+            aria-label="Zoom out"
             onClick={() => zoomBy(-1)}
-            className="flex h-10 w-10 cursor-pointer items-center justify-center text-lg text-[var(--glass-text)] hover:bg-[var(--glass-highlight)]"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center text-[#5f6368] hover:bg-[#f1f3f4] hover:text-[#202124]"
           >
-            −
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+              <path d="M19 13H5v-2h14z" />
+            </svg>
           </button>
         </div>
       </div>
@@ -870,7 +979,7 @@ function MapButton({ title, onClick, children }: { title: string; onClick: () =>
       title={title}
       aria-label={title}
       onClick={onClick}
-      className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] text-[var(--glass-text)] shadow-lg backdrop-blur-md hover:bg-[var(--glass-highlight)]"
+      className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg bg-white text-[#5f6368] shadow-[var(--maps-shadow)] hover:bg-[#f1f3f4] hover:text-[#202124]"
     >
       {children}
     </button>

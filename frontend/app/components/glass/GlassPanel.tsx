@@ -14,7 +14,7 @@ export function GlassPanel({
   return (
     <div className={`glass-panel ${strong ? "glass-panel-strong" : ""} p-4 ${className}`}>
       {title && (
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--glass-text-dim)]">
+        <div className="mb-3 text-[15px] font-medium text-[var(--glass-text)]">
           {title}
         </div>
       )}

@@ -143,11 +143,24 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+// Static layers are requested by several components (map, search, panels):
+// fetch each once per page load.
+const staticCache = new Map<string, Promise<GeoJSON.FeatureCollection>>();
+function staticGeoJson(path: string): Promise<GeoJSON.FeatureCollection> {
+  let pending = staticCache.get(path);
+  if (!pending) {
+    pending = getJson<GeoJSON.FeatureCollection>(path);
+    pending.catch(() => staticCache.delete(path));
+    staticCache.set(path, pending);
+  }
+  return pending;
+}
+
 export const api = {
-  riversGeoJson: () => getJson<GeoJSON.FeatureCollection>("/rivers/geojson"),
-  damsGeoJson: () => getJson<GeoJSON.FeatureCollection>("/dams/geojson"),
-  boundaryGeoJson: () => getJson<GeoJSON.FeatureCollection>("/boundary/geojson"),
-  impactGeoJson: () => getJson<GeoJSON.FeatureCollection>("/impact/geojson"),
+  riversGeoJson: () => staticGeoJson("/rivers/geojson"),
+  damsGeoJson: () => staticGeoJson("/dams/geojson"),
+  boundaryGeoJson: () => staticGeoJson("/boundary/geojson"),
+  impactGeoJson: () => staticGeoJson("/impact/geojson"),
   forecast: (riverId: string) => getJson<RiverForecast>(`/forecast/rivers/${riverId}`),
   floodForecast: () => getJson<FloodForecast>("/flood/forecast"),
   sources: () => getJson<SourcesState>("/sources"),

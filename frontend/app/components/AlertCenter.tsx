@@ -3,8 +3,16 @@
 import { useEffect, useState } from "react";
 import { api, type Alert } from "../lib/api";
 import { GlassPanel } from "./glass/GlassPanel";
+import type { MapSelection } from "./KeralaMap";
+import { RiskPill } from "./PanelParts";
 
-export function AlertCenter() {
+export function AlertCenter({
+  names,
+  onSelect,
+}: {
+  names: Record<string, string>;
+  onSelect: (selection: MapSelection) => void;
+}) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
@@ -19,27 +27,34 @@ export function AlertCenter() {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)));
   }
 
+  const open = alerts.filter((a) => !a.acknowledged).length;
+
   return (
-    <GlassPanel title={`Active alerts (${alerts.filter((a) => !a.acknowledged).length})`} className="w-[320px] max-h-[38vh] overflow-y-auto varuna-scrollbar">
-      {alerts.length === 0 && (
-        <div className="text-sm text-[var(--glass-text-dim)]">No active alerts — all basins NORMAL.</div>
-      )}
-      <div className="flex flex-col gap-2">
+    <GlassPanel className="w-[340px] p-0">
+      <div className="flex items-center justify-between px-4 pb-2 pt-3">
+        <span className="text-[15px] font-medium text-[#202124]">Alerts</span>
+        <span className="text-xs text-[#70757a]">{open ? `${open} need attention` : "All clear"}</span>
+      </div>
+      <div className="max-h-[32vh] overflow-y-auto varuna-scrollbar pb-2">
+        {alerts.length === 0 && <div className="px-4 pb-2 text-sm text-[#5f6368]">No active alerts. All basins are normal.</div>}
         {alerts.map((alert) => (
-          <div key={alert.id} className="rounded-lg bg-[var(--glass-highlight)] px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-semibold risk-text-${alert.risk}`}>
-                <span className={`risk-dot risk-${alert.risk} mr-1.5`} />
-                {alert.risk}
-              </span>
-              <span className="text-[10px] uppercase text-[var(--glass-text-dim)]">{alert.target_type}</span>
+          <div
+            key={alert.id}
+            className={`cursor-pointer border-t border-[#f1f3f4] px-4 py-2.5 hover:bg-[#f8f9fa] ${alert.acknowledged ? "opacity-60" : ""}`}
+            onClick={() => onSelect({ type: alert.target_type === "dam" ? "dam" : "river", id: alert.target_id })}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-sm font-medium text-[#202124]">{names[alert.target_id] ?? alert.target_id}</span>
+              <RiskPill risk={alert.risk} compact />
             </div>
-            <div className="text-sm font-medium mt-1 capitalize">{alert.target_id}</div>
-            <div className="text-xs text-[var(--glass-text-dim)] mt-0.5">{alert.message}</div>
+            <div className="mt-0.5 text-xs text-[#5f6368]">{alert.message}</div>
             {!alert.acknowledged && (
               <button
-                onClick={() => ack(alert.id)}
-                className="mt-2 text-[11px] glass-button px-2.5 py-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  ack(alert.id);
+                }}
+                className="-ml-2 mt-1.5 cursor-pointer rounded-full px-2 py-0.5 text-xs font-medium text-[#1a73e8] hover:bg-[#e8f0fe]"
               >
                 Acknowledge
               </button>

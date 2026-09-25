@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { api } from "../lib/api";
-import { GlassPanel } from "./glass/GlassPanel";
 
 interface Turn {
   role: "user" | "assistant";
@@ -36,15 +35,16 @@ export function AIAssistant() {
   }
 
   return (
-    <GlassPanel title="Ask VARUNA" className="w-[320px] flex flex-col">
+    <div className="flex flex-col">
+      <div className="mb-3 text-xs text-[#70757a]">Answers use the current data and flood forecast only.</div>
       <div className="flex flex-col gap-2 max-h-[24vh] overflow-y-auto varuna-scrollbar mb-2">
         {turns.length === 0 && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => send(s)}
-                className="text-left text-xs text-[var(--glass-text-dim)] rounded-lg bg-[var(--glass-highlight)] px-2.5 py-1.5 hover:text-[var(--glass-text)] cursor-pointer"
+                className="cursor-pointer rounded-full border border-[#dadce0] px-3 py-1 text-left text-xs text-[#3c4043] hover:bg-[#f1f3f4]"
               >
                 {s}
               </button>
@@ -54,14 +54,14 @@ export function AIAssistant() {
         {turns.map((t, i) => (
           <div
             key={i}
-            className={`text-sm rounded-lg px-2.5 py-1.5 ${
-              t.role === "user" ? "bg-[var(--accent)]/20 self-end" : "bg-[var(--glass-highlight)]"
+            className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${
+              t.role === "user" ? "self-end bg-[#e8f0fe] text-[#174ea6]" : "self-start bg-[#f1f3f4] text-[#202124]"
             }`}
           >
             {t.text}
           </div>
         ))}
-        {loading && <div className="text-xs text-[var(--glass-text-dim)]">Thinking…</div>}
+        {loading && <div className="text-xs text-[#70757a]">Thinking…</div>}
       </div>
       <form
         onSubmit={(e) => {
@@ -74,12 +74,18 @@ export function AIAssistant() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Which areas may be affected in 6h?"
-          className="flex-1 rounded-full bg-[var(--glass-highlight)] px-3 py-1.5 text-sm outline-none placeholder:text-[var(--glass-text-dim)]"
+          className="flex-1 rounded-full bg-[#f1f3f4] px-4 py-2 text-sm text-[#202124] outline-none placeholder:text-[#70757a] focus:bg-white focus:ring-2 focus:ring-[#1a73e8]"
         />
-        <button type="submit" className="glass-button px-3 py-1.5 text-sm">
-          Ask
+        <button
+          type="submit"
+          aria-label="Ask"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-[#1a73e8] text-white hover:bg-[#1765cc]"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+            <path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" />
+          </svg>
         </button>
       </form>
-    </GlassPanel>
+    </div>
   );
 }

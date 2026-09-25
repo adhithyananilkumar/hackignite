@@ -1,172 +1,173 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { AIAssistant } from "../components/AIAssistant";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCenter } from "../components/AlertCenter";
 import { DamPanel } from "../components/DamPanel";
-import { DataHealthPanel } from "../components/DataHealthPanel";
 import { DataSourceSwitcher } from "../components/DataSourceSwitcher";
 import { FloodTimeline } from "../components/FloodTimeline";
-import { GlassPanel } from "../components/glass/GlassPanel";
-import { KeralaMap, type MapFocus, type MapSelection } from "../components/KeralaMap";
+import {
+  type Basemap,
+  DEFAULT_LAYERS,
+  KeralaMap,
+  type LayerToggles,
+  type MapFocus,
+  type MapSelection,
+} from "../components/KeralaMap";
+import { KeralaOverview, type PlaceMeta } from "../components/KeralaOverview";
+import { BasemapToggle, LayerChips } from "../components/MapChrome";
 import { RiverPanel } from "../components/RiverPanel";
-import { api, type ExposedAsset, type LiveSourceStatus } from "../lib/api";
+import { SearchBox, type SearchResult } from "../components/SearchBox";
+import { api, type ExposedAsset, type LiveSourceStatus, type SimulationSourceStatus } from "../lib/api";
 import { useFloodForecast } from "../lib/useFloodForecast";
 import { useLiveData } from "../lib/useLiveData";
 
-const RISK_ORDER = ["NORMAL", "WATCH", "ADVISORY", "HIGH", "CRITICAL"];
+// Screen space taken by floating UI (px), so map framing keeps Kerala visible.
+const SIDE_PANEL_W = 408;
+const RIGHT_COLUMN_W = 364;
 
 export default function CommandCenter() {
   const { snapshot, connected } = useLiveData();
   const flood = useFloodForecast(snapshot?.mode);
-  const [riverNames, setRiverNames] = useState<Record<string, string>>({});
-  const [damNames, setDamNames] = useState<Record<string, string>>({});
+  const [rivers, setRivers] = useState<PlaceMeta>({});
+  const [dams, setDams] = useState<PlaceMeta>({});
   const [selection, setSelection] = useState<MapSelection>(null);
   const [horizonIndex, setHorizonIndex] = useState(0);
   const [focus, setFocus] = useState<MapFocus>(null);
-  const focusAsset = useCallback(
-    (a: ExposedAsset) => setFocus({ lon: a.lon, lat: a.lat, key: `${a.id}-${Date.now()}` }),
-    []
-  );
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [basemap, setBasemap] = useState<Basemap>("map");
+  const [layers, setLayers] = useState<LayerToggles>(DEFAULT_LAYERS);
+
+  const flyTo = useCallback((lon: number, lat: number, id: string) => setFocus({ lon, lat, key: `${id}-${Date.now()}` }), []);
+  const focusAsset = useCallback((a: ExposedAsset) => flyTo(a.lon, a.lat, a.id), [flyTo]);
+  const select = useCallback((s: MapSelection) => {
+    setSelection(s);
+    if (s) setPanelOpen(true);
+  }, []);
 
   useEffect(() => {
     api.riversGeoJson().then((fc) => {
-      const map: Record<string, string> = {};
-      for (const f of fc.features) map[(f.properties as any).id] = (f.properties as any).name;
-      setRiverNames(map);
+      const meta: PlaceMeta = {};
+      for (const f of fc.features) {
+        const p = f.properties as Record<string, string>;
+        meta[p.id] = { name: p.name, subtitle: `Gauge at ${p.gauge_town}` };
+      }
+      setRivers(meta);
     });
     api.damsGeoJson().then((fc) => {
-      const map: Record<string, string> = {};
-      for (const f of fc.features) map[(f.properties as any).id] = (f.properties as any).name;
-      setDamNames(map);
+      const meta: PlaceMeta = {};
+      for (const f of fc.features) {
+        const p = f.properties as Record<string, string>;
+        meta[p.id] = { name: p.name, subtitle: `${p.river} · ${p.district} district` };
+      }
+      setDams(meta);
     });
   }, []);
 
-  const liveStatus = snapshot?.mode === "live" ? (snapshot.source_status as LiveSourceStatus) : null;
-  const healthKey = `${snapshot?.mode}:${liveStatus?.state ?? ""}:${liveStatus?.last_updated ?? ""}`;
-
-  const rivers = snapshot ? Object.values(snapshot.rivers) : [];
-  const dams = snapshot ? Object.values(snapshot.dams) : [];
-
-  const worstRisk = [...rivers, ...dams].reduce(
-    (worst, r) => (RISK_ORDER.indexOf(r.risk) > RISK_ORDER.indexOf(worst) ? r.risk : worst),
-    "NORMAL"
+  const onSearchPick = useCallback(
+    (r: SearchResult) => {
+      if ("lon" in r) flyTo(r.lon, r.lat, r.id);
+      else select({ type: r.kind, id: r.id });
+    },
+    [select, flyTo]
   );
 
-  const sortedRivers = [...rivers].sort((a, b) => RISK_ORDER.indexOf(b.risk) - RISK_ORDER.indexOf(a.risk));
-  const sortedDams = [...dams].sort((a, b) => RISK_ORDER.indexOf(b.risk) - RISK_ORDER.indexOf(a.risk));
+  const liveStatus = snapshot?.mode === "live" ? (snapshot.source_status as LiveSourceStatus) : null;
+  const healthKey = `${snapshot?.mode}:${liveStatus?.state ?? ""}:${liveStatus?.last_updated ?? ""}`;
+  const simStatus = snapshot?.mode === "simulation" ? (snapshot.source_status as SimulationSourceStatus) : null;
+  const modeLabel = simStatus
+    ? `Simulation: ${simStatus.scenarios?.find((s) => s.id === simStatus.scenario_id)?.name ?? simStatus.scenario_id}`
+    : "Live data";
+  const names = useMemo(
+    () => Object.fromEntries([...Object.entries(rivers), ...Object.entries(dams)].map(([id, m]) => [id, m.name])),
+    [rivers, dams]
+  );
+  const mapPadding = useMemo(
+    () => ({ top: 72, bottom: 190, left: panelOpen ? SIDE_PANEL_W + 24 : 40, right: RIGHT_COLUMN_W + 16 }),
+    [panelOpen]
+  );
+  const leftEdge = panelOpen ? SIDE_PANEL_W + 16 : 16;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden" data-theme="dark">
+    <div className="maps-ui relative h-screen w-screen overflow-hidden bg-[#aadaff]">
       <KeralaMap
         snapshot={snapshot}
         selection={selection}
         flood={flood}
         horizonIndex={horizonIndex}
         focus={focus}
-        onSelectRiver={(id) => setSelection({ type: "river", id })}
-        onSelectDam={(id) => setSelection({ type: "dam", id })}
+        basemap={basemap}
+        layers={layers}
+        padding={mapPadding}
+        onSelectRiver={(id) => select({ type: "river", id })}
+        onSelectDam={(id) => select({ type: "dam", id })}
         onDeselect={() => setSelection(null)}
       />
-      <div className="atmosphere-vignette" />
-      <div className="atmosphere-overlay" />
 
-      {/* Top bar */}
-      <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between gap-4 pointer-events-none">
-        <GlassPanel strong className="pointer-events-auto flex items-center gap-4 py-2.5">
-          <Link href="/" className="text-sm font-semibold tracking-wide">
-            ← VARUNA
-          </Link>
-          <span className="text-[var(--glass-text-dim)] text-xs">Kerala Flood Intelligence</span>
-        </GlassPanel>
-        <DataSourceSwitcher snapshot={snapshot} />
-        <GlassPanel strong className="pointer-events-auto flex items-center gap-3 py-2.5">
-          <span className={`text-xs font-semibold risk-text-${worstRisk}`}>
-            <span className={`risk-dot risk-${worstRisk} mr-1.5`} />
-            {worstRisk}
-          </span>
-          <span className="text-xs text-[var(--glass-text-dim)]" title="Streaming connection to the VARUNA backend">
-            {connected ? "● Connected" : "Reconnecting…"}
-          </span>
-        </GlassPanel>
-      </div>
-
-      {/* Left column: basins + dams */}
-      <div className="absolute top-24 left-4 z-10 flex flex-col gap-4">
-        <GlassPanel title="Rivers" className="w-[260px] max-h-[32vh] overflow-y-auto varuna-scrollbar">
-          <div className="flex flex-col gap-1">
-            {sortedRivers.map((r) => (
-              <button
-                key={r.river_id}
-                onClick={() => setSelection({ type: "river", id: r.river_id })}
-                className="flex items-center justify-between text-sm rounded-lg px-2 py-1.5 hover:bg-[var(--glass-highlight)] cursor-pointer text-left"
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`risk-dot risk-${r.risk}`} />
-                  {riverNames[r.river_id] ?? r.river_id}
-                </span>
-                <span className="text-[11px] text-[var(--glass-text-dim)]">{r.level_m}m</span>
-              </button>
-            ))}
+      {/* Left: search bar + side panel (overview or place details) */}
+      <div
+        className="pointer-events-none absolute bottom-3 left-3 top-3 z-20 flex flex-col gap-3"
+        style={{ width: SIDE_PANEL_W - 8 }}
+      >
+        <div className="pointer-events-auto">
+          <SearchBox onPick={onSearchPick} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen((o) => !o)} />
+        </div>
+        {panelOpen && (
+          <div className="pointer-events-auto min-h-0 flex-1 overflow-y-auto rounded-xl bg-white shadow-[var(--maps-shadow)] varuna-scrollbar">
+            {selection?.type === "river" ? (
+              <RiverPanel
+                riverId={selection.id}
+                reading={snapshot?.rivers?.[selection.id]}
+                name={rivers[selection.id]?.name ?? selection.id}
+                subtitle={`River · ${rivers[selection.id]?.subtitle ?? ""}`}
+                flood={flood?.rivers.find((r) => r.river_id === selection.id)}
+                horizonIndex={horizonIndex}
+                onHorizonChange={setHorizonIndex}
+                onFocusAsset={focusAsset}
+                onClose={() => setSelection(null)}
+              />
+            ) : selection?.type === "dam" ? (
+              <DamPanel
+                name={dams[selection.id]?.name ?? selection.id}
+                subtitle={`Reservoir · ${dams[selection.id]?.subtitle ?? ""}`}
+                reading={snapshot?.dams?.[selection.id]}
+                onClose={() => setSelection(null)}
+              />
+            ) : (
+              <KeralaOverview
+                snapshot={snapshot}
+                flood={flood}
+                rivers={rivers}
+                dams={dams}
+                modeLabel={modeLabel}
+                healthKey={healthKey}
+                onSelect={select}
+              />
+            )}
           </div>
-        </GlassPanel>
-
-        <GlassPanel title="Dams" className="w-[260px] max-h-[28vh] overflow-y-auto varuna-scrollbar">
-          <div className="flex flex-col gap-1">
-            {sortedDams.map((d) => (
-              <button
-                key={d.dam_id}
-                onClick={() => setSelection({ type: "dam", id: d.dam_id })}
-                className="flex items-center justify-between text-sm rounded-lg px-2 py-1.5 hover:bg-[var(--glass-highlight)] cursor-pointer text-left"
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`risk-dot risk-${d.risk}`} />
-                  {damNames[d.dam_id] ?? d.dam_id}
-                </span>
-                <span className="text-[11px] text-[var(--glass-text-dim)]">{d.storage_pct}%</span>
-              </button>
-            ))}
-          </div>
-        </GlassPanel>
-
-        <DataHealthPanel refreshKey={healthKey} />
+        )}
       </div>
 
-      {/* Right column: alerts + AI */}
-      <div className="absolute top-24 right-4 z-10 flex flex-col gap-4">
-        <AlertCenter />
-        <AIAssistant />
+      {/* Top: layer chips beside the search bar */}
+      <div className="absolute top-4 z-10" style={{ left: SIDE_PANEL_W + 16, right: RIGHT_COLUMN_W + 16 }}>
+        <LayerChips layers={layers} onChange={setLayers} />
       </div>
 
-      {/* Flood forecast timeline */}
-      <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
+      {/* Right: data source + alerts */}
+      <div className="absolute right-3 top-3 z-10 flex flex-col gap-3">
+        <DataSourceSwitcher snapshot={snapshot} connected={connected} />
+        <AlertCenter names={names} onSelect={select} />
+      </div>
+
+      {/* Bottom: layers toggle (left) and forecast timeline (centre of the free map area) */}
+      <div className="absolute bottom-6 z-10 transition-[left] duration-200" style={{ left: leftEdge + 8 }}>
+        <BasemapToggle basemap={basemap} onChange={setBasemap} />
+      </div>
+      <div
+        className="absolute bottom-6 z-10 -translate-x-1/2"
+        style={{ left: `calc(${leftEdge}px + (100% - ${leftEdge + RIGHT_COLUMN_W}px) / 2 + 40px)` }}
+      >
         <FloodTimeline forecast={flood} horizonIndex={horizonIndex} onHorizonChange={setHorizonIndex} />
       </div>
-
-      {/* Detail panel */}
-      {selection && (
-        <div className="absolute bottom-4 left-4 z-10">
-          {selection.type === "river" ? (
-            <RiverPanel
-              riverId={selection.id}
-              reading={snapshot?.rivers?.[selection.id]}
-              name={riverNames[selection.id] ?? selection.id}
-              flood={flood?.rivers.find((r) => r.river_id === selection.id)}
-              horizonIndex={horizonIndex}
-              onHorizonChange={setHorizonIndex}
-              onFocusAsset={focusAsset}
-              onClose={() => setSelection(null)}
-            />
-          ) : (
-            <DamPanel
-              name={damNames[selection.id] ?? selection.id}
-              reading={snapshot?.dams?.[selection.id]}
-              onClose={() => setSelection(null)}
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 }

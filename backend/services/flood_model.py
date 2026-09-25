@@ -51,11 +51,13 @@ def _empty_tile() -> bytes:
 EMPTY_TILE = _empty_tile()
 
 # (min depth m, RGBA). Single source of truth for the PNG overlay and the UI legend.
+# Saturated blues so floodwater reads clearly against a light basemap and is
+# distinct from the pale sea colour.
 DEPTH_BANDS = (
-    (0.0, (127, 212, 255, 120)),
-    (0.5, (58, 168, 240, 155)),
-    (1.0, (31, 111, 209, 185)),
-    (2.0, (20, 64, 160, 210)),
+    (0.0, (100, 160, 245, 150)),
+    (0.5, (52, 120, 235, 175)),
+    (1.0, (25, 90, 200, 200)),
+    (2.0, (13, 55, 150, 220)),
 )
 
 
@@ -204,7 +206,8 @@ class RemFloodModel:
         self._lock = threading.Lock()
         self.manifest = self._load_manifest()
         # Changes whenever grids are rebuilt, so extent URLs can be cached forever.
-        self.version = f"{MODEL_ID}-{hashlib.sha1(self.manifest.get('built_at', '').encode()).hexdigest()[:8]}"
+        fingerprint = f"{self.manifest.get('built_at', '')}|{DEPTH_BANDS}"
+        self.version = f"{MODEL_ID}-{hashlib.sha1(fingerprint.encode()).hexdigest()[:8]}"
 
     def _load_manifest(self) -> dict:
         path = self._terrain_dir / "manifest.json"

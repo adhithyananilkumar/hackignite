@@ -78,6 +78,81 @@
   border-radius: 999px;
 }
 
+/* ---------- Google-Maps-style light theme for the command center ---------- */
+.maps-ui {
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-border: #dadce0;
+  --glass-highlight: #f1f3f4;
+  --glass-text: #202124;
+  --glass-text-dim: #5f6368;
+  --accent: #1a73e8;
+  --accent-soft: #e8f0fe;
+  --risk-normal: #1e8e3e;
+  --risk-watch: #f9ab00;
+  --risk-advisory: #fa7b17;
+  --risk-high: #e8453c;
+  --risk-critical: #c5221f;
+  --maps-shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+  font-family: var(--font-roboto), Roboto, Arial, sans-serif;
+  color: var(--glass-text);
+}
+
+.maps-ui .glass-panel {
+  border: none;
+  border-radius: 12px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--maps-shadow);
+}
+
+.maps-ui .glass-button {
+  background: #ffffff;
+  border: 1px solid var(--glass-border);
+  color: var(--accent);
+  font-weight: 500;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.maps-ui .glass-button:hover {
+  background: var(--accent-soft);
+  transform: none;
+}
+
+/* Text on white needs darker variants of the status colours. */
+.maps-ui .risk-text-NORMAL { color: #137333; }
+.maps-ui .risk-text-WATCH { color: #b06000; }
+.maps-ui .risk-text-ADVISORY { color: #c26401; }
+.maps-ui .risk-text-HIGH { color: #d93025; }
+.maps-ui .risk-text-CRITICAL { color: #a50e0e; }
+
+.maps-ui .maplibregl-ctrl-attrib {
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+}
+
+.maps-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #3c4043;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--maps-shadow);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.maps-chip:hover { background: #f8f9fa; }
+.maps-chip[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: #1967d2;
+}
+
 /* Atmospheric smoke/cloud drift over the command map — purely decorative,
    pointer-events disabled so it never intercepts clicks on the map/panels. */
 .atmosphere-overlay {

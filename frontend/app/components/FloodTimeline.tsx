@@ -60,12 +60,12 @@ export function FloodTimeline({
     <GlassPanel strong className="w-[560px] py-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--glass-text-dim)]">Flood forecast</span>
+          <span className="text-[15px] font-medium text-[var(--glass-text)]">Flood forecast</span>
           <span
             className="rounded-full border border-[var(--glass-border)] px-2 py-px text-[10px] text-[var(--glass-text-dim)]"
             title={forecast.model_label}
           >
-            MODELLED
+            Modelled
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -85,7 +85,7 @@ export function FloodTimeline({
         <button
           onClick={togglePlay}
           aria-label={playing ? "Pause forecast" : "Play forecast"}
-          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--accent,#35c2f0)] text-[#04111a] hover:brightness-110"
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--accent)] text-white hover:brightness-110"
         >
           {playing ? (
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
@@ -102,7 +102,7 @@ export function FloodTimeline({
         <div className="relative flex flex-1 items-center justify-between">
           <div className="absolute left-3 right-3 top-1/2 h-0.5 -translate-y-1/2 bg-[var(--glass-border)]" />
           <div
-            className="absolute left-3 top-1/2 h-0.5 -translate-y-1/2 bg-[var(--accent,#35c2f0)] transition-all duration-500"
+            className="absolute left-3 top-1/2 h-0.5 -translate-y-1/2 bg-[var(--accent)] transition-all duration-500"
             style={{ width: `calc((100% - 1.5rem) * ${horizons.length > 1 ? horizonIndex / (horizons.length - 1) : 0})` }}
           />
           {horizons.map((h, i) => (
@@ -112,9 +112,9 @@ export function FloodTimeline({
                 setPlaying(false);
                 onHorizonChange(i);
               }}
-              className={`relative z-10 cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+              className={`relative z-10 cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                 i === horizonIndex
-                  ? "bg-[var(--accent,#35c2f0)] text-[#04111a]"
+                  ? "bg-[var(--accent)] text-white"
                   : i < horizonIndex
                     ? "bg-[var(--glass-bg-strong)] text-[var(--glass-text)]"
                     : "bg-[var(--glass-bg-strong)] text-[var(--glass-text-dim)] hover:text-[var(--glass-text)]"
@@ -129,7 +129,7 @@ export function FloodTimeline({
       <div className="mt-3 grid grid-cols-5 gap-1.5">
         {stats.map(([label, value]) => (
           <div key={label} className="rounded-lg bg-[var(--glass-highlight)] px-2 py-1.5">
-            <div className="text-sm font-semibold tabular-nums">{value}</div>
+            <div className="text-sm font-medium tabular-nums">{value}</div>
             <div className="text-[10px] text-[var(--glass-text-dim)]">{label}</div>
           </div>
         ))}
