@@ -132,6 +132,33 @@ class SimulationProvider(StateProvider):
         gauge = self.gauges.get(river_id)
         return None if gauge is None else round(self._level_at(gauge, self._u_after(hours_ahead)), 2)
 
+    def _dam_at(self, dam_id: str, u: float) -> tuple[float, float, float]:
+        """(storage %, inflow m³/s, outflow m³/s) at scenario fraction `u`.
+        Inflow peaks with the rivers and recedes afterwards, like a hydrograph."""
+        cfg = self.scenario.get("dams", {}).get(dam_id)
+        if cfg is None:
+            d = self.dam_defaults
+            return d["storage_pct"], d["inflow_m3s"], d["outflow_m3s"]
+        fill = _smoothstep(min(u, 1.0) / 0.9)
+        storage = cfg["storage_start_pct"] + (cfg["storage_peak_pct"] - cfg["storage_start_pct"]) * fill
+        pulse = _smoothstep(u / 0.75) if u <= 0.75 else max(0.0, 1 - (u - 0.75) * 1.6)
+        inflow = cfg["inflow_base"] + (cfg["inflow_peak"] - cfg["inflow_base"]) * pulse
+        outflow = cfg["outflow_base"] + (cfg["inflow_peak"] - cfg["inflow_base"]) * fill * 0.55
+        return storage, inflow, outflow
+
+    def has_dam_profile(self, dam_id: str) -> bool:
+        return dam_id in self.scenario.get("dams", {})
+
+    def dam_inflow_forecast(self, dam_id: str, hours_ahead: float) -> float | None:
+        if not self.has_dam_profile(dam_id):
+            return None
+        return self._dam_at(dam_id, self._u_after(hours_ahead))[1]
+
+    def sea_level_offset_m(self, hours_ahead: float = 0.0) -> float:
+        """Scripted storm surge / monsoon set-up added to the live tide in simulation."""
+        surge = self.scenario.get("coast", {}).get("surge_m", 0.0)
+        return surge * _smoothstep(self._u_after(hours_ahead) / 0.8)
+
     def _compute(self) -> None:
         u = self.progress
         step_h = 0.5
@@ -150,18 +177,10 @@ class SimulationProvider(StateProvider):
                 source="simulation",
             )
 
-        dam_profiles = self.scenario.get("dams", {})
         for dam_id in self.dam_ids:
-            cfg = dam_profiles.get(dam_id)
-            if cfg is None:
-                storage = self.dam_defaults["storage_pct"]
-                inflow = self.dam_defaults["inflow_m3s"]
-                outflow = self.dam_defaults["outflow_m3s"]
-            else:
-                s = _smoothstep(u / 0.9)
-                storage = cfg["storage_start_pct"] + (cfg["storage_peak_pct"] - cfg["storage_start_pct"]) * s
-                inflow = cfg["inflow_base"] + (cfg["inflow_peak"] - cfg["inflow_base"]) * s + random.uniform(-15, 15)
-                outflow = cfg["outflow_base"] + (cfg["inflow_peak"] - cfg["inflow_base"]) * s * 0.55
+            storage, inflow, outflow = self._dam_at(dam_id, u)
+            if dam_id in self.scenario.get("dams", {}):
+                inflow += random.uniform(-15, 15)
             risk = compute_dam_risk(storage, inflow, outflow)
             self._dams[dam_id] = DamReading(
                 dam_id=dam_id,

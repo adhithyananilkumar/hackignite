@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
+from services.coastal import coastal
 from services.flood_model import MODEL_LABEL, flood_model
 from services.sources.hub import hub
 
@@ -14,6 +15,12 @@ def data_health():
     now = datetime.now(UTC).isoformat()
     sources = [
         *hub.health(),
+        {
+            "name": "Copernicus Marine sea level",
+            "status": "LIVE",
+            "detail": f"{len(coastal.outlets)} river mouths · tide + surge, hourly",
+            "as_of": now,
+        },
         {
             "name": "Flood extent model",
             "status": "MODELLED" if flood_model.manifest.get("rivers") else "UNAVAILABLE",

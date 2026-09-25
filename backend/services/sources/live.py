@@ -28,32 +28,19 @@ import httpx
 import numpy as np
 
 from models import DamReading, RiskLevel, RiverReading
+from services.glofas import CALIBRATION_CACHE as CACHE_PATH
+from services.glofas import GLOFAS_URL
+from services.glofas import get_json as _get_json
 from services.risk_engine import compute_dam_risk, compute_river_risk
 from services.sources.base import Gauge, StateProvider, load_dam_defaults, load_dam_ids, now_iso
 
-GLOFAS_URL = "https://flood-api.open-meteo.com/v1/flood"
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 HISTORY_RANGE = ("1984-01-01", "2023-12-31")
 REFRESH_S = 900  # GloFAS is daily and Open-Meteo hourly; 15 min is plenty
 RETRY_AFTER_ERROR_S = 60
-CACHE_PATH = Path(__file__).resolve().parent.parent.parent / ".cache" / "glofas_calibration.json"
 SNAP_YEAR = ("2023-01-01", "2023-12-31")
 EXPONENT_RANGE = (0.2, 1.0)
 MAX_CONCURRENT_GAUGES = 2  # stay well inside Open-Meteo's fair-use limits
-MAX_ATTEMPTS = 4
-
-
-async def _get_json(client: httpx.AsyncClient, url: str, params: dict):
-    """GET with backoff on 429/5xx, honouring Retry-After."""
-    for attempt in range(MAX_ATTEMPTS):
-        resp = await client.get(url, params=params)
-        if resp.status_code != 429 and resp.status_code < 500:
-            resp.raise_for_status()
-            return resp.json()
-        if attempt == MAX_ATTEMPTS - 1:
-            resp.raise_for_status()
-        retry_after = resp.headers.get("Retry-After", "")
-        await asyncio.sleep(float(retry_after) if retry_after.isdigit() else 2.0 * 2**attempt)
 
 
 @dataclass

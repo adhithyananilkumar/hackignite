@@ -74,6 +74,14 @@ class StateProvider(ABC):
         extrapolate from the current rise rate."""
         return None
 
+    def dam_inflow_forecast(self, dam_id: str, hours_ahead: float) -> float | None:
+        """Provider's own inflow forecast for a dam, or None to fall back to GloFAS."""
+        return None
+
+    def sea_level_offset_m(self, hours_ahead: float = 0.0) -> float:
+        """Added to observed sea level (non-zero only for scripted surge scenarios)."""
+        return 0.0
+
     def forecast_confidence(self, hours_ahead: float) -> float:
         return max(35.0, 92.0 - hours_ahead * 5.5)
 

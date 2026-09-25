@@ -7,7 +7,9 @@ import os
 from anthropic import AsyncAnthropic
 
 from models import RiskLevel
+from services.coastal import coastal
 from services.flood_forecast import build_flood_forecast
+from services.reservoirs import reservoirs
 from services.sources.hub import hub
 
 _NAMED_ASSETS_PER_TYPE = 8
@@ -47,7 +49,8 @@ SYSTEM_PROMPT = (
     "whether it is live or a simulated scenario — say so when it is simulated. "
     "Answer only from that JSON — never invent numbers. Be concise, operational, "
     "and do not issue commands to open/close dams; only note when thresholds are "
-    "being approached, consistent with Kerala's approved rule curves and EAPs."
+    "being approached, consistent with Kerala's approved rule curves and EAPs. Reservoir advisories "
+    "are decision support for the dam authority: present them as items to review, never as orders."
 )
 
 
@@ -58,7 +61,7 @@ def _get_client() -> AsyncAnthropic | None:
     return _client
 
 
-def build_context() -> dict:
+async def build_context() -> dict:
     """Every river, but full forecast/exposure detail only for rivers above
     NORMAL, so the prompt stays small as more rivers are added."""
     active = hub.active
@@ -91,6 +94,32 @@ def build_context() -> dict:
         if dam.risk != RiskLevel.NORMAL or dam.source != "static":
             context["dams"][dam.dam_id] = dam.model_dump(mode="json")
 
+    # Live context from external services is best-effort: a slow or failed feed
+    # must not stop the assistant answering from what it has.
+    try:
+        coast = await coastal.snapshot()
+        context["sea_level"] = {
+            "note": "Arabian Sea level at river mouths (Copernicus Marine). High sea level + high river flow = backwater, slower drainage.",
+            "outlets": {
+                o["name"]: {
+                    "level_m": o["level_m"], "status": o["status"], "drainage": o["drainage"],
+                    "tide_filtered_anomaly_m": o["tide_filtered_anomaly_m"],
+                    "next_high": o["next_highs"][:1], "next_low": o["next_lows"][:1],
+                    "rivers": [r["name"] for r in o["rivers"]],
+                }
+                for o in coast["outlets"]
+            },
+        }
+    except Exception:  # noqa: BLE001
+        context["sea_level"] = {"available": False}
+    try:
+        context["reservoir_advisories"] = [
+            {k: a.get(k) for k in ("name", "status", "headline", "peak_worst_pct", "recommendation", "downstream")}
+            for a in await reservoirs.advisories()
+        ]
+    except Exception:  # noqa: BLE001
+        context["reservoir_advisories"] = []
+
     return context
 
 
@@ -108,7 +137,7 @@ def _fallback_answer(question: str, context: dict) -> str:
 
 
 async def ask(question: str) -> dict:
-    context = build_context()
+    context = await build_context()
     client = _get_client()
     if client is None:
         return {"answer": _fallback_answer(question, context), "context": context}
@@ -127,7 +156,7 @@ async def ask(question: str) -> dict:
 
 
 async def explain_transition(river_id: str, old_risk: str, new_risk: str) -> str:
-    context = build_context()
+    context = await build_context()
     client = _get_client()
     if client is None:
         data = context["rivers"].get(river_id, {})

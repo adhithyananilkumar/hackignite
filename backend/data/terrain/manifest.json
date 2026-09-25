@@ -41,24 +41,24 @@
       "bytes": 162452
     },
     "chalakudy": {
-      "cells": 119862,
-      "water_cells": 12598,
+      "cells": 138380,
+      "water_cells": 14071,
       "grid": [
-        518,
-        411
+        451,
+        750
       ],
-      "population_in_corridor": 638325,
-      "bytes": 172323
+      "population_in_corridor": 743295,
+      "bytes": 194106
     },
     "achankovil": {
-      "cells": 107155,
-      "water_cells": 3174,
+      "cells": 159859,
+      "water_cells": 5974,
       "grid": [
-        309,
-        669
+        518,
+        1287
       ],
-      "population_in_corridor": 678667,
-      "bytes": 135362
+      "population_in_corridor": 993648,
+      "bytes": 236993
     },
     "kabini": {
       "cells": 14919,
@@ -79,10 +79,140 @@
       ],
       "population_in_corridor": 230555,
       "bytes": 122299
+    },
+    "meenachil": {
+      "cells": 151325,
+      "water_cells": 26377,
+      "grid": [
+        400,
+        941
+      ],
+      "population_in_corridor": 696445,
+      "bytes": 199301
+    },
+    "manimala": {
+      "cells": 181828,
+      "water_cells": 21614,
+      "grid": [
+        594,
+        513
+      ],
+      "population_in_corridor": 1095606,
+      "bytes": 221419
+    },
+    "muvattupuzha": {
+      "cells": 136531,
+      "water_cells": 26634,
+      "grid": [
+        621,
+        627
+      ],
+      "population_in_corridor": 661657,
+      "bytes": 219169
+    },
+    "kallada": {
+      "cells": 79857,
+      "water_cells": 13280,
+      "grid": [
+        427,
+        828
+      ],
+      "population_in_corridor": 386538,
+      "bytes": 150789
+    },
+    "karamana": {
+      "cells": 35103,
+      "water_cells": 985,
+      "grid": [
+        425,
+        388
+      ],
+      "population_in_corridor": 293617,
+      "bytes": 65867
+    },
+    "neyyar": {
+      "cells": 25568,
+      "water_cells": 1918,
+      "grid": [
+        431,
+        372
+      ],
+      "population_in_corridor": 203638,
+      "bytes": 59154
+    },
+    "kadalundi": {
+      "cells": 73488,
+      "water_cells": 3139,
+      "grid": [
+        471,
+        723
+      ],
+      "population_in_corridor": 464960,
+      "bytes": 136719
+    },
+    "kuppam": {
+      "cells": 52431,
+      "water_cells": 7503,
+      "grid": [
+        562,
+        485
+      ],
+      "population_in_corridor": 213883,
+      "bytes": 107446
+    },
+    "chandragiri": {
+      "cells": 34243,
+      "water_cells": 2832,
+      "grid": [
+        476,
+        556
+      ],
+      "population_in_corridor": 114944,
+      "bytes": 78173
+    },
+    "mayyazhi": {
+      "cells": 64065,
+      "water_cells": 1428,
+      "grid": [
+        356,
+        503
+      ],
+      "population_in_corridor": 416510,
+      "bytes": 105810
+    },
+    "kariangode": {
+      "cells": 33951,
+      "water_cells": 4664,
+      "grid": [
+        358,
+        519
+      ],
+      "population_in_corridor": 112933,
+      "bytes": 71181
+    },
+    "anjarakandy": {
+      "cells": 45703,
+      "water_cells": 1356,
+      "grid": [
+        288,
+        477
+      ],
+      "population_in_corridor": 217280,
+      "bytes": 78497
+    },
+    "bhavani": {
+      "cells": 28083,
+      "water_cells": 1399,
+      "grid": [
+        365,
+        435
+      ],
+      "population_in_corridor": 94203,
+      "bytes": 29191
     }
   },
   "model": "rem-v1",
-  "built_at": "2026-09-25T05:29:57.968384+00:00",
+  "built_at": "2026-09-25T08:41:12.583820+00:00",
   "zoom": 11,
   "corridor_deg": 0.1,
   "max_rem_m": 15.0,
