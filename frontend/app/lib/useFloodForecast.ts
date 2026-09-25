@@ -7,7 +7,8 @@ const POLL_MS = 5000;
 
 // The forecast document is small (extents are separate, immutable PNGs), so
 // polling is cheap; it tracks the live snapshot closely enough for the map.
-export function useFloodForecast() {
+// `sourceKey` (the active data-source mode) forces an immediate refetch on switch.
+export function useFloodForecast(sourceKey?: string) {
   const [forecast, setForecast] = useState<FloodForecast | null>(null);
 
   useEffect(() => {
@@ -23,7 +24,7 @@ export function useFloodForecast() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [sourceKey]);
 
   return forecast;
 }

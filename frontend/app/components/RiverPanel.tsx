@@ -6,6 +6,12 @@ import { horizonLabel } from "./FloodTimeline";
 import { GlassPanel } from "./glass/GlassPanel";
 import { ImpactPanel } from "./ImpactPanel";
 
+const SOURCE_LABELS: Record<string, string> = {
+  simulation: "SIMULATED",
+  "live:glofas": "LIVE · GloFAS-derived stage",
+  "live:pending": "LIVE · awaiting feed",
+};
+
 export function RiverPanel({
   riverId,
   reading,
@@ -52,9 +58,14 @@ export function RiverPanel({
         </button>
       </div>
 
-      <div className={`inline-block mb-3 rounded-full px-2.5 py-0.5 text-xs font-semibold risk-text-${reading.risk}`}>
-        <span className={`risk-dot risk-${reading.risk} mr-1.5`} />
-        {reading.risk}
+      <div className="mb-3 flex items-center gap-2">
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold risk-text-${reading.risk}`}>
+          <span className={`risk-dot risk-${reading.risk} mr-1.5`} />
+          {reading.risk}
+        </span>
+        <span className="rounded-full border border-[var(--glass-border)] px-2 py-px text-[10px] text-[var(--glass-text-dim)]">
+          {SOURCE_LABELS[reading.source] ?? reading.source}
+        </span>
       </div>
 
       <div className="mb-4">
@@ -88,6 +99,25 @@ export function RiverPanel({
           <div className="text-[11px] text-[var(--glass-text-dim)]">Danger crossing</div>
         </div>
       </div>
+
+      {(reading.discharge_m3s != null || reading.rain_next_24h_mm != null) && (
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="rounded-lg bg-[var(--glass-highlight)] px-3 py-2">
+            <div className="text-sm font-semibold tabular-nums">
+              {reading.discharge_m3s != null ? `${Math.round(reading.discharge_m3s).toLocaleString()} m³/s` : "—"}
+            </div>
+            <div className="text-[11px] text-[var(--glass-text-dim)]">Discharge</div>
+          </div>
+          <div className="rounded-lg bg-[var(--glass-highlight)] px-3 py-2">
+            <div className="text-sm font-semibold tabular-nums">{reading.rain_past_24h_mm ?? "—"} mm</div>
+            <div className="text-[11px] text-[var(--glass-text-dim)]">Rain, last 24h</div>
+          </div>
+          <div className="rounded-lg bg-[var(--glass-highlight)] px-3 py-2">
+            <div className="text-sm font-semibold tabular-nums">{reading.rain_next_24h_mm ?? "—"} mm</div>
+            <div className="text-[11px] text-[var(--glass-text-dim)]">Rain, next 24h</div>
+          </div>
+        </div>
+      )}
 
       {flood ? (
         <>

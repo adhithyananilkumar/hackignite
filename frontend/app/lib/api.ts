@@ -10,6 +10,10 @@ export interface RiverReading {
   rise_rate_m_per_hr: number;
   risk: RiskLevel;
   updated_at: string;
+  source: string;
+  discharge_m3s: number | null;
+  rain_past_24h_mm: number | null;
+  rain_next_24h_mm: number | null;
 }
 
 export interface DamReading {
@@ -20,6 +24,34 @@ export interface DamReading {
   rule_level_status: string;
   risk: RiskLevel;
   updated_at: string;
+  source: string;
+}
+
+export type SourceMode = "live" | "simulation";
+
+export interface LiveSourceStatus {
+  state: "loading" | "ok" | "degraded" | "unavailable";
+  last_updated: string | null;
+  gauges_live: number;
+  gauges_total: number;
+  errors: number;
+}
+
+export interface SimulationSourceStatus {
+  scenario_id: string;
+  scenarios: { id: string; name: string; description: string }[];
+  playing: boolean;
+  speed: number;
+  speeds: number[];
+  progress: number;
+  scenario_hours: number;
+  represents_hours: number;
+}
+
+export interface SourcesState {
+  mode: SourceMode;
+  modes: { id: SourceMode; label: string; kind: string; description: string }[];
+  status: { live: LiveSourceStatus; simulation: SimulationSourceStatus };
 }
 
 export interface ForecastPoint {
@@ -101,6 +133,16 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json();
 }
 
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+
 export const api = {
   riversGeoJson: () => getJson<GeoJSON.FeatureCollection>("/rivers/geojson"),
   damsGeoJson: () => getJson<GeoJSON.FeatureCollection>("/dams/geojson"),
@@ -108,6 +150,10 @@ export const api = {
   impactGeoJson: () => getJson<GeoJSON.FeatureCollection>("/impact/geojson"),
   forecast: (riverId: string) => getJson<RiverForecast>(`/forecast/rivers/${riverId}`),
   floodForecast: () => getJson<FloodForecast>("/flood/forecast"),
+  sources: () => getJson<SourcesState>("/sources"),
+  setSourceMode: (mode: SourceMode) => postJson<SourcesState>("/sources/mode", { mode }),
+  controlSimulation: (body: { scenario_id?: string; action?: "play" | "pause" | "restart"; speed?: number }) =>
+    postJson<SourcesState>("/sources/simulation", body),
   alerts: () => getJson<Alert[]>("/alerts"),
   health: () => getJson<{ sources: DataHealthSource[] }>("/health"),
   ackAlert: (id: string) => fetch(`${API_BASE}/alerts/${id}/ack`, { method: "POST" }),

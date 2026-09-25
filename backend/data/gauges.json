@@ -1,7 +1,7 @@
 {
   "note": "One reference gauge per modelled river. Levels are metres at the gauge. Thresholds are indicative placeholders pending official CWC warning/danger levels; replace per gauge. Adding a river = add a gauge here (coordinates must sit on the main channel for the GloFAS feed).",
   "gauges": {
-    "periyar":       { "name": "Aluva",        "coordinates": [76.3517, 10.1097], "normal_m": 2.8, "warning_m": 4.2, "danger_m": 5.0 },
+    "periyar":       { "name": "Aluva",        "coordinates": [76.3517, 10.1097], "normal_m": 2.6, "warning_m": 4.2, "danger_m": 5.0 },
     "pamba":         { "name": "Chengannur",   "coordinates": [76.6167, 9.3167],  "normal_m": 2.4, "warning_m": 4.0, "danger_m": 4.8 },
     "bharathapuzha": { "name": "Shoranur",     "coordinates": [76.2667, 10.7667], "normal_m": 2.0, "warning_m": 3.5, "danger_m": 4.2 },
     "chaliyar":      { "name": "Nilambur",     "coordinates": [76.2333, 11.2767], "normal_m": 1.2, "warning_m": 3.0, "danger_m": 3.8 },

@@ -6,11 +6,12 @@ import { AIAssistant } from "../components/AIAssistant";
 import { AlertCenter } from "../components/AlertCenter";
 import { DamPanel } from "../components/DamPanel";
 import { DataHealthPanel } from "../components/DataHealthPanel";
+import { DataSourceSwitcher } from "../components/DataSourceSwitcher";
 import { FloodTimeline } from "../components/FloodTimeline";
 import { GlassPanel } from "../components/glass/GlassPanel";
 import { KeralaMap, type MapFocus, type MapSelection } from "../components/KeralaMap";
 import { RiverPanel } from "../components/RiverPanel";
-import { api, type ExposedAsset } from "../lib/api";
+import { api, type ExposedAsset, type LiveSourceStatus } from "../lib/api";
 import { useFloodForecast } from "../lib/useFloodForecast";
 import { useLiveData } from "../lib/useLiveData";
 
@@ -18,7 +19,7 @@ const RISK_ORDER = ["NORMAL", "WATCH", "ADVISORY", "HIGH", "CRITICAL"];
 
 export default function CommandCenter() {
   const { snapshot, connected } = useLiveData();
-  const flood = useFloodForecast();
+  const flood = useFloodForecast(snapshot?.mode);
   const [riverNames, setRiverNames] = useState<Record<string, string>>({});
   const [damNames, setDamNames] = useState<Record<string, string>>({});
   const [selection, setSelection] = useState<MapSelection>(null);
@@ -41,6 +42,9 @@ export default function CommandCenter() {
       setDamNames(map);
     });
   }, []);
+
+  const liveStatus = snapshot?.mode === "live" ? (snapshot.source_status as LiveSourceStatus) : null;
+  const healthKey = `${snapshot?.mode}:${liveStatus?.state ?? ""}:${liveStatus?.last_updated ?? ""}`;
 
   const rivers = snapshot ? Object.values(snapshot.rivers) : [];
   const dams = snapshot ? Object.values(snapshot.dams) : [];
@@ -76,13 +80,14 @@ export default function CommandCenter() {
           </Link>
           <span className="text-[var(--glass-text-dim)] text-xs">Kerala Flood Intelligence</span>
         </GlassPanel>
+        <DataSourceSwitcher snapshot={snapshot} />
         <GlassPanel strong className="pointer-events-auto flex items-center gap-3 py-2.5">
           <span className={`text-xs font-semibold risk-text-${worstRisk}`}>
             <span className={`risk-dot risk-${worstRisk} mr-1.5`} />
             {worstRisk}
           </span>
-          <span className="text-xs text-[var(--glass-text-dim)]">
-            {connected ? "LIVE ●" : "reconnecting…"}
+          <span className="text-xs text-[var(--glass-text-dim)]" title="Streaming connection to the VARUNA backend">
+            {connected ? "● Connected" : "Reconnecting…"}
           </span>
         </GlassPanel>
       </div>
@@ -125,7 +130,7 @@ export default function CommandCenter() {
           </div>
         </GlassPanel>
 
-        <DataHealthPanel />
+        <DataHealthPanel refreshKey={healthKey} />
       </div>
 
       {/* Right column: alerts + AI */}

@@ -27,7 +27,7 @@ from pathlib import Path
 import httpx
 import numpy as np
 
-from models import DamReading, RiverReading
+from models import DamReading, RiskLevel, RiverReading
 from services.risk_engine import compute_dam_risk, compute_river_risk
 from services.sources.base import Gauge, StateProvider, load_dam_defaults, load_dam_ids, now_iso
 
@@ -35,18 +35,42 @@ GLOFAS_URL = "https://flood-api.open-meteo.com/v1/flood"
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 HISTORY_RANGE = ("1984-01-01", "2023-12-31")
 REFRESH_S = 900  # GloFAS is daily and Open-Meteo hourly; 15 min is plenty
+RETRY_AFTER_ERROR_S = 60
 CACHE_PATH = Path(__file__).resolve().parent.parent.parent / ".cache" / "glofas_calibration.json"
+SNAP_YEAR = ("2023-01-01", "2023-12-31")
 EXPONENT_RANGE = (0.2, 1.0)
+MAX_CONCURRENT_GAUGES = 2  # stay well inside Open-Meteo's fair-use limits
+MAX_ATTEMPTS = 4
+
+
+async def _get_json(client: httpx.AsyncClient, url: str, params: dict):
+    """GET with backoff on 429/5xx, honouring Retry-After."""
+    for attempt in range(MAX_ATTEMPTS):
+        resp = await client.get(url, params=params)
+        if resp.status_code != 429 and resp.status_code < 500:
+            resp.raise_for_status()
+            return resp.json()
+        if attempt == MAX_ATTEMPTS - 1:
+            resp.raise_for_status()
+        retry_after = resp.headers.get("Retry-After", "")
+        await asyncio.sleep(float(retry_after) if retry_after.isdigit() else 2.0 * 2**attempt)
 
 
 @dataclass
 class Calibration:
+    lat: float  # GloFAS cell actually sampled (snapped to the main channel)
+    lon: float
     q2: float
     q5: float
     exponent: float
 
 
-def _calibrate(times: list[str], discharge: list[float | None], gauge: Gauge) -> Calibration:
+# GloFAS is a ~0.05° grid; a gauge coordinate can land on a tributary cell. Search
+# the surrounding cells and keep the one carrying the most water.
+SNAP_OFFSETS_DEG = (-0.05, 0.0, 0.05)
+
+
+def _calibrate(lat: float, lon: float, times: list[str], discharge: list[float | None], gauge: Gauge) -> Calibration:
     by_year: dict[str, list[float]] = {}
     for day, q in zip(times, discharge):
         if q is not None:
@@ -57,7 +81,7 @@ def _calibrate(times: list[str], discharge: list[float | None], gauge: Gauge) ->
         exponent = 0.5
     else:
         exponent = math.log(gauge.warning_m / gauge.danger_m) / math.log(q2 / q5)
-    return Calibration(q2=q2, q5=q5, exponent=min(max(exponent, EXPONENT_RANGE[0]), EXPONENT_RANGE[1]))
+    return Calibration(lat=lat, lon=lon, q2=q2, q5=q5, exponent=min(max(exponent, EXPONENT_RANGE[0]), EXPONENT_RANGE[1]))
 
 
 class LiveProvider(StateProvider):
@@ -85,7 +109,8 @@ class LiveProvider(StateProvider):
         if not CACHE_PATH.exists():
             return {}
         raw = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
-        return {rid: Calibration(**c) for rid, c in raw.items() if rid in self.gauges}
+        fields = set(Calibration.__dataclass_fields__)
+        return {rid: Calibration(**c) for rid, c in raw.items() if rid in self.gauges and set(c) == fields}
 
     def _save_calibration(self) -> None:
         CACHE_PATH.parent.mkdir(exist_ok=True)
@@ -107,27 +132,51 @@ class LiveProvider(StateProvider):
             self._task = asyncio.create_task(self._refresh())
 
     async def _refresh(self) -> None:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            await asyncio.gather(*(self._refresh_gauge(client, g) for g in self.gauges.values()))
+        limit = asyncio.Semaphore(MAX_CONCURRENT_GAUGES)
+
+        async def bounded(client: httpx.AsyncClient, gauge: Gauge) -> None:
+            async with limit:
+                await self._refresh_gauge(client, gauge)
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            await asyncio.gather(*(bounded(client, g) for g in self.gauges.values()))
         if any(rid in self._discharge for rid in self.gauges):
             self._last_success = now_iso()
+        if self._errors:
+            # Partial failure (rate limit, network): try again soon rather than in 15 min.
+            self._last_refresh = time.time() - REFRESH_S + RETRY_AFTER_ERROR_S
         self._compute()
 
     async def _refresh_gauge(self, client: httpx.AsyncClient, gauge: Gauge) -> None:
-        point = {"latitude": gauge.lat, "longitude": gauge.lon}
         try:
             if gauge.river_id not in self._calibration:
-                resp = await client.get(GLOFAS_URL, params={
-                    **point, "daily": "river_discharge", "start_date": HISTORY_RANGE[0], "end_date": HISTORY_RANGE[1],
+                # Snap with one recent year (cheap), then pull full history for that cell only.
+                candidates = [(gauge.lat + dy, gauge.lon + dx) for dy in SNAP_OFFSETS_DEG for dx in SNAP_OFFSETS_DEG]
+                cells = await _get_json(client, GLOFAS_URL, {
+                    "latitude": ",".join(f"{lat:.4f}" for lat, _ in candidates),
+                    "longitude": ",".join(f"{lon:.4f}" for _, lon in candidates),
+                    "daily": "river_discharge", "start_date": SNAP_YEAR[0], "end_date": SNAP_YEAR[1],
                 })
-                resp.raise_for_status()
-                daily = resp.json()["daily"]
-                self._calibration[gauge.river_id] = _calibrate(daily["time"], daily["river_discharge"], gauge)
+                cells = cells if isinstance(cells, list) else [cells]
+
+                def median_flow(cell: dict) -> float:
+                    values = [q for q in cell["daily"]["river_discharge"] if q is not None]
+                    return float(np.median(values)) if values else -1.0
+
+                best = max(cells, key=median_flow)
+                history = (await _get_json(client, GLOFAS_URL, {
+                    "latitude": best["latitude"], "longitude": best["longitude"],
+                    "daily": "river_discharge", "start_date": HISTORY_RANGE[0], "end_date": HISTORY_RANGE[1],
+                }))["daily"]
+                self._calibration[gauge.river_id] = _calibrate(
+                    best["latitude"], best["longitude"], history["time"], history["river_discharge"], gauge
+                )
                 self._save_calibration()
 
-            resp = await client.get(GLOFAS_URL, params={**point, "daily": "river_discharge", "past_days": 3, "forecast_days": 7})
-            resp.raise_for_status()
-            daily = resp.json()["daily"]
+            cal = self._calibration[gauge.river_id]
+            daily = (await _get_json(client, GLOFAS_URL, {
+                "latitude": cal.lat, "longitude": cal.lon, "daily": "river_discharge", "past_days": 3, "forecast_days": 7,
+            }))["daily"]
             pairs = [(t, q) for t, q in zip(daily["time"], daily["river_discharge"]) if q is not None]
             # Daily means are placed at midday UTC for interpolation.
             epochs = np.array([datetime.fromisoformat(t).replace(tzinfo=UTC, hour=12).timestamp() for t, _ in pairs])
@@ -137,11 +186,9 @@ class LiveProvider(StateProvider):
             self._errors[f"glofas:{gauge.river_id}"] = str(exc) or type(exc).__name__
 
         try:
-            resp = await client.get(WEATHER_URL, params={
-                **point, "hourly": "precipitation", "past_days": 1, "forecast_days": 2, "timezone": "UTC",
-            })
-            resp.raise_for_status()
-            hourly = resp.json()["hourly"]
+            hourly = (await _get_json(client, WEATHER_URL, {
+                "latitude": gauge.lat, "longitude": gauge.lon, "hourly": "precipitation", "past_days": 1, "forecast_days": 2, "timezone": "UTC",
+            }))["hourly"]
             now = datetime.now(UTC)
             past = nxt = 0.0
             for t, p in zip(hourly["time"], hourly["precipitation"]):
@@ -187,7 +234,7 @@ class LiveProvider(StateProvider):
             if q is None or rid not in self._calibration:
                 self._rivers[rid] = RiverReading(
                     river_id=rid, level_m=gauge.normal_m, danger_level_m=gauge.danger_m, warning_level_m=gauge.warning_m,
-                    rise_rate_m_per_hr=0.0, risk=compute_river_risk(gauge.normal_m, gauge.danger_m, gauge.warning_m, 0.0),
+                    rise_rate_m_per_hr=0.0, risk=RiskLevel.NORMAL,
                     updated_at=now_iso(), source="live:pending",
                     rain_past_24h_mm=rain[0], rain_next_24h_mm=rain[1],
                 )

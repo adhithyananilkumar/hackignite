@@ -9,11 +9,14 @@ const STATUS_COLOR: Record<string, string> = {
   SIMULATED: "risk-text-WATCH",
   STATIC: "risk-text-ADVISORY",
   MODELLED: "text-[#7fd4ff]",
+  DEGRADED: "risk-text-ADVISORY",
+  "NOT CONNECTED": "text-[var(--glass-text-dim)]",
   OFFLINE: "risk-text-CRITICAL",
   UNAVAILABLE: "risk-text-CRITICAL",
 };
 
-export function DataHealthPanel() {
+// `refreshKey` changes when the data source or its feed state changes.
+export function DataHealthPanel({ refreshKey }: { refreshKey?: string }) {
   const [sources, setSources] = useState<DataHealthSource[]>([]);
 
   useEffect(() => {
@@ -21,7 +24,7 @@ export function DataHealthPanel() {
     load();
     const interval = setInterval(load, 20000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshKey]);
 
   return (
     <GlassPanel title="Data health" className="w-[280px]">

@@ -404,12 +404,17 @@ export function KeralaMap({
         antialias: true,
       });
       mapRef.current = map;
-      (window as unknown as { __map: unknown }).__map = map; // TEMP debug
       // Google-Maps-style gestures: left-drag pans, right-drag (or ctrl+drag)
       // rotates and tilts, wheel zooms toward the cursor, double-click zooms in.
       map.dragRotate.enable();
       map.touchZoomRotate.enableRotation();
       map.keyboard.enable();
+      // Swapping flood tile URLs cancels in-flight tile requests; MapLibre reports
+      // those as AbortErrors. They're expected, so only surface real failures.
+      map.on("error", (e: { error?: Error }) => {
+        if (e.error?.name === "AbortError" || e.error?.message === "AbortError") return;
+        console.error(e.error);
+      });
       map.on("rotate", () => setBearing(map.getBearing()));
       map.on("pitch", () => setPitch(map.getPitch()));
 
