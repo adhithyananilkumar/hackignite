@@ -42,7 +42,7 @@ export default function CommandCenter() {
   const [horizonIndex, setHorizonIndex] = useState(0);
   const [focus, setFocus] = useState<MapFocus>(null);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [basemap, setBasemap] = useState<Basemap>("map");
+  const [basemap, setBasemap] = useState<Basemap>("satellite");
   const [layers, setLayers] = useState<LayerToggles>(DEFAULT_LAYERS);
   const [pin, setPin] = useState<MapPin | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
