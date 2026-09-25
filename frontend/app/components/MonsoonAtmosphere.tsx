@@ -20,8 +20,13 @@ interface MistCloud {
   opacity: number;
 }
 
-export function MonsoonAtmosphere() {
+export function MonsoonAtmosphere({ isButtonHovered = false }: { isButtonHovered?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const hoverRef = useRef(false);
+
+  useEffect(() => {
+    hoverRef.current = isButtonHovered;
+  }, [isButtonHovered]);
   const mouseRef = useRef<{ x: number; y: number; targetX: number; targetY: number }>({
     x: 0,
     y: 0,
@@ -104,9 +109,14 @@ export function MonsoonAtmosphere() {
     ];
 
     let time = 0;
+    let rainOpacityMultiplier = 1.0;
 
     const render = () => {
       time += 0.005;
+
+      const targetMultiplier = hoverRef.current ? 0.0 : 1.0;
+      // Slower lerp for a gentle 2-3 second fade
+      rainOpacityMultiplier += (targetMultiplier - rainOpacityMultiplier) * 0.012;
 
       // Smooth mouse lerp for natural parallax
       const mouse = mouseRef.current;
@@ -221,7 +231,7 @@ export function MonsoonAtmosphere() {
           drop.x = -120;
         }
 
-        ctx.strokeStyle = `rgba(185, 215, 230, ${drop.opacity})`;
+        ctx.strokeStyle = `rgba(185, 215, 230, ${drop.opacity * rainOpacityMultiplier})`;
         ctx.lineWidth = drop.width;
         ctx.beginPath();
         ctx.moveTo(drop.x, drop.y);

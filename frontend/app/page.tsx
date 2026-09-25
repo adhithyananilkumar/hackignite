@@ -2,9 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import { MonsoonAtmosphere } from "./components/MonsoonAtmosphere";
 
 export default function Landing() {
+  const [isButtonHovered, setIsButtonHovered] = useState(false);
+
   return (
     <main 
       className="relative flex h-screen w-screen flex-col justify-between overflow-hidden bg-[#050B0F] p-6 sm:p-10 select-none text-[#E8EEF2]"
@@ -18,7 +21,7 @@ export default function Landing() {
           fill
           priority
           sizes="100vw"
-          className="object-cover object-center scale-[1.02] brightness-[0.88] contrast-[1.04] saturate-[0.95]"
+          className="object-cover object-center scale-[1.02] brightness-[1.1] contrast-[1.04] saturate-[0.95]"
         />
       </div>
 
@@ -28,7 +31,7 @@ export default function Landing() {
         className="pointer-events-none fixed inset-0 z-[1]"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 50%, rgba(5, 11, 15, 0.55) 0%, rgba(5, 11, 15, 0.22) 50%, rgba(5, 11, 15, 0.65) 100%)",
+            "radial-gradient(ellipse at 50% 50%, rgba(5, 11, 15, 0.4) 0%, rgba(5, 11, 15, 0.1) 50%, rgba(5, 11, 15, 0.5) 100%)",
         }}
         aria-hidden="true"
       />
@@ -52,7 +55,7 @@ export default function Landing() {
       />
 
       {/* --- LAYER 3: DYNAMIC MONSOON MIST, CONTOUR HINTS & RAIN --- */}
-      <MonsoonAtmosphere />
+      <MonsoonAtmosphere isButtonHovered={isButtonHovered} />
 
       {/* Subtle corner technical registration crosses */}
       <div className="pointer-events-none absolute left-4 top-4 z-10 font-mono text-[10px] text-[#2F4452] opacity-75">
@@ -112,6 +115,8 @@ export default function Landing() {
         <div className="mt-8 sm:mt-9">
           <Link
             href="/command"
+            onMouseEnter={() => setIsButtonHovered(true)}
+            onMouseLeave={() => setIsButtonHovered(false)}
             className="group relative inline-flex items-center gap-3 rounded-lg border border-white/[0.12] bg-[#0B171C]/92 px-8 py-3.5 text-xs sm:text-sm font-medium tracking-[0.12em] text-[#E8EEF2] shadow-xl shadow-black/50 backdrop-blur-md transition-all duration-200 hover:border-[#5FB8D4]/45 hover:bg-[#10222B] hover:text-white hover:shadow-[#5FB8D4]/10 active:scale-[0.99]"
           >
             <span>OPEN VARUNA</span>
