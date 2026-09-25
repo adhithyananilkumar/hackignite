@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { FloodForecast, RiskLevel } from "../lib/api";
 import { horizonTotals } from "../lib/useFloodForecast";
 import type { LiveSnapshot } from "../lib/useLiveData";
-import { AIAssistant } from "./AIAssistant";
 import { DataHealthList } from "./DataHealthPanel";
 import type { MapSelection } from "./KeralaMap";
 import { RiskPill, Section } from "./PanelParts";
@@ -12,6 +11,7 @@ import { RiskPill, Section } from "./PanelParts";
 export type PlaceMeta = Record<string, { name: string; subtitle: string }>;
 
 const RISK_ORDER: RiskLevel[] = ["NORMAL", "WATCH", "ADVISORY", "HIGH", "CRITICAL"];
+
 const byRisk = <T extends { risk: RiskLevel }>(a: T, b: T) => RISK_ORDER.indexOf(b.risk) - RISK_ORDER.indexOf(a.risk);
 
 function ListIcon({ kind }: { kind: "river" | "dam" }) {
@@ -84,10 +84,6 @@ export function KeralaOverview({
           ))}
         </div>
       </div>
-
-      <Section title="Ask VARUNA">
-        <AIAssistant />
-      </Section>
 
       <div role="tablist" className="flex border-b border-black/[0.07] px-2">
         {(["rivers", "dams"] as const).map((t) => (

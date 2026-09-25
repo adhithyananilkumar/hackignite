@@ -210,7 +210,7 @@ def _ui_context(ui: dict | None) -> str:
 async def chat(message: str, history: list[dict], ui: dict | None) -> dict:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        return await _offline_chat(message, ui)
+        return await _offline_chat(message, ui, "*Offline mode — set GEMINI_API_KEY for full answers.*")
 
     contents = [
         {"role": "model" if t["role"] == "assistant" else "user", "parts": [{"text": t["text"]}]}
@@ -225,19 +225,21 @@ async def chat(message: str, history: list[dict], ui: dict | None) -> dict:
     steps: list[dict] = []
     async with httpx.AsyncClient(timeout=60.0) as client:
         for _ in range(MAX_TOOL_ROUNDS):
-            resp = await client.post(
-                GEMINI_URL.format(model=model),
-                headers={"x-goog-api-key": api_key},
-                json={
-                    "systemInstruction": {"parts": [{"text": system}]},
-                    "contents": contents,
-                    "tools": TOOLS,
-                    "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1200},
-                },
-            )
-            if resp.status_code != 200:
-                detail = resp.json().get("error", {}).get("message", resp.text[:200]) if resp.headers.get("content-type", "").startswith("application/json") else resp.text[:200]
-                return {"answer": f"Gemini request failed ({resp.status_code}): {detail}", "actions": actions, "steps": steps}
+            try:
+                resp = await client.post(
+                    GEMINI_URL.format(model=model),
+                    headers={"x-goog-api-key": api_key},
+                    json={
+                        "systemInstruction": {"parts": [{"text": system}]},
+                        "contents": contents,
+                        "tools": TOOLS,
+                        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1200},
+                    },
+                )
+                resp.raise_for_status()
+            except httpx.HTTPError as exc:
+                # Still answer from the data, and say why Gemini isn't doing it.
+                return await _offline_chat(message, ui, f"*Gemini unavailable ({_gemini_error(exc)}) — showing a data-only answer.*")
             candidate = (resp.json().get("candidates") or [{}])[0]
             content = candidate.get("content") or {"role": "model", "parts": []}
             parts = content.get("parts", [])
@@ -264,7 +266,17 @@ async def chat(message: str, history: list[dict], ui: dict | None) -> dict:
     return {"answer": "That needed too many lookups — try a more specific question.", "actions": actions, "steps": steps}
 
 
-# ---------------- offline fallback (no GEMINI_API_KEY) ----------------
+def _gemini_error(exc: httpx.HTTPError) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            message = exc.response.json()["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            message = exc.response.text[:120]
+        return f"{exc.response.status_code}: {message}"
+    return type(exc).__name__
+
+
+# ---------------- offline fallback (no key, or Gemini unreachable) ----------------
 
 def _mentioned(message: str, names: dict[str, str]) -> str | None:
     text = message.lower()
@@ -275,8 +287,8 @@ def _mentioned(message: str, names: dict[str, str]) -> str | None:
     return None
 
 
-async def _offline_chat(message: str, ui: dict | None) -> dict:
-    note = "_Offline mode — set GEMINI_API_KEY for full answers._\n\n"
+async def _offline_chat(message: str, ui: dict | None, note: str) -> dict:
+    note += "\n\n"
     pin = (ui or {}).get("pin")
     if river_id := _mentioned(message, RIVER_NAMES):
         result, action = await get_river_status(river_id)

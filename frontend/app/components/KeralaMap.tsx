@@ -4,6 +4,7 @@ import type * as maplibregl from "maplibre-gl";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { API_BASE, api, type CoastalSnapshot, type FloodForecast } from "../lib/api";
 import type { LiveSnapshot } from "../lib/useLiveData";
+import type { MapPin } from "./LocationPanel";
 
 // maplibre-gl is loaded from a CDN <script>, injected manually below, instead
 // of the npm bundle: Next.js/Turbopack fails to resolve maplibre-gl's worker
@@ -63,6 +64,16 @@ const SATELLITE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Wo
 const TERRAIN_DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 const ROUTE_HIGHLIGHT_COLOR = "#1a73e8";
 const LABEL_TEXT = "#3c4043";
+const PIN_ZOOM = 12.5;
+
+// Google-style red drop pin, anchored at its tip.
+function createPinElement() {
+  const el = document.createElement("div");
+  el.style.cssText = "width:30px;height:42px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));cursor:pointer";
+  el.innerHTML =
+    '<svg viewBox="0 0 30 42" width="30" height="42"><path d="M15 1C7.3 1 1 7.2 1 14.9 1 25.4 15 41 15 41s14-15.6 14-26.1C29 7.2 22.7 1 15 1z" fill="#ea4335" stroke="#b31412" stroke-width="1.2"/><circle cx="15" cy="15" r="5" fill="#a50e0e"/></svg>';
+  return el;
+}
 
 export type MapSelection = { type: "river" | "dam"; id: string } | null;
 export type MapFocus = { lon: number; lat: number; key: string } | null;
@@ -193,9 +204,11 @@ export function KeralaMap({
   basemap = "map",
   layers = DEFAULT_LAYERS,
   padding = { top: 80, bottom: 160, left: 60, right: 60 },
+  pin = null,
   onSelectRiver,
   onSelectDam,
   onDeselect,
+  onPickPoint,
 }: {
   snapshot: LiveSnapshot | null;
   selection?: MapSelection;
@@ -210,6 +223,10 @@ export function KeralaMap({
   onSelectRiver?: (id: string) => void;
   onSelectDam?: (id: string) => void;
   onDeselect?: () => void;
+  /** Dropped pin, shown as a marker; the map flies to it when `pin.fly` is set. */
+  pin?: MapPin | null;
+  /** Click on empty map: drop a pin there (otherwise the click deselects). */
+  onPickPoint?: (lon: number, lat: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -237,6 +254,9 @@ export function KeralaMap({
   }, [coastal]);
   const basemapRef = useRef<Basemap>(basemap);
   const layersRef = useRef<LayerToggles>(layers);
+  const pinRef = useRef<MapPin | null>(pin);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const onPickPointRef = useRef(onPickPoint);
 
   useEffect(() => {
     paddingRef.current = padding;
@@ -332,7 +352,41 @@ export function KeralaMap({
 
   useEffect(() => {
     onDeselectRef.current = onDeselect;
-  }, [onDeselect]);
+    onPickPointRef.current = onPickPoint;
+  }, [onDeselect, onPickPoint]);
+
+  // Declared before the selection effect so a pin dropped while clearing a
+  // selection is already known there (and the camera stays with the pin).
+  useEffect(() => {
+    pinRef.current = pin;
+    syncPin(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin?.key]);
+
+  function syncPin(moveCamera: boolean) {
+    const map = mapRef.current;
+    const current = pinRef.current;
+    if (!map || !mapReadyRef.current) return;
+    if (!current) {
+      markerRef.current?.remove();
+      markerRef.current = null;
+      return;
+    }
+    if (!markerRef.current) {
+      markerRef.current = new window.maplibregl.Marker({ element: createPinElement(), anchor: "bottom" });
+    }
+    markerRef.current.setLngLat([current.lon, current.lat]).addTo(map);
+    if (moveCamera && current.fly) {
+      map.flyTo({
+        center: [current.lon, current.lat],
+        zoom: Math.max(map.getZoom(), PIN_ZOOM),
+        pitch: 55,
+        padding: paddingRef.current,
+        duration: 1600,
+        essential: true,
+      });
+    }
+  }
 
   useEffect(() => {
     snapshotRef.current = snapshot;
@@ -349,7 +403,7 @@ export function KeralaMap({
     if (!selection) {
       resetHighlight(map);
       const overview = overviewRef.current;
-      if (overview) {
+      if (overview && !pinRef.current) {
         map.flyTo({ ...overview, duration: 1600, essential: true });
       }
       return;
@@ -953,7 +1007,10 @@ export function KeralaMap({
 
         map.on("click", (e: maplibregl.MapMouseEvent) => {
           const hit = pick(e.point);
-          if (!hit) return onDeselectRef.current?.();
+          if (!hit) {
+            if (onPickPointRef.current) return onPickPointRef.current(e.lngLat.lng, e.lngLat.lat);
+            return onDeselectRef.current?.();
+          }
           if (hit.kind === "asset") {
             map.flyTo({ center: hit.lngLat, zoom: Math.max(map.getZoom(), 14), pitch: 62, duration: 1200, essential: true });
           } else if (hit.kind === "outlet") {
@@ -966,6 +1023,7 @@ export function KeralaMap({
         mapReadyRef.current = true;
         syncFlood();
         applyDisplayOptions();
+        syncPin(true);
       });
     }
 

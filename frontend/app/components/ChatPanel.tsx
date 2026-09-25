@@ -5,11 +5,12 @@ import type { ChatAction, ChatStep } from "../lib/api";
 import type { ChatMessage } from "../lib/useVarunaChat";
 import { LIKELIHOOD_COLORS, SparkleIcon } from "./LocationPanel";
 
-// Just enough Markdown for Gemini's replies: paragraphs, bullets, **bold**, _italic_.
+// Just enough Markdown for Gemini's replies: paragraphs, bullets, **bold**, *italic*.
+// (Underscore italics are skipped so identifiers like GEMINI_API_KEY survive.)
 function inline(text: string): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*|_[^_]+_|\*[^*\s][^*]*\*)/g).map((part, i) => {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).map((part, i) => {
     if (/^\*\*.+\*\*$/.test(part)) return <strong key={i} className="font-medium">{part.slice(2, -2)}</strong>;
-    if (/^(_.+_|\*.+\*)$/.test(part)) return <em key={i}>{part.slice(1, -1)}</em>;
+    if (/^\*.+\*$/.test(part)) return <em key={i}>{part.slice(1, -1)}</em>;
     return <Fragment key={i}>{part}</Fragment>;
   });
 }

@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { SparkleIcon } from "./LocationPanel";
 
 export type SearchResult =
   | { kind: "river" | "dam"; id: string; name: string; detail: string }
-  | { kind: "hospital" | "school" | "shelter" | "bridge"; id: string; name: string; detail: string; lon: number; lat: number };
+  | { kind: "hospital" | "school" | "shelter" | "bridge" | "place"; id: string; name: string; detail: string; lon: number; lat: number };
 
 const KIND_LABEL: Record<SearchResult["kind"], string> = {
   river: "River",
@@ -14,6 +15,7 @@ const KIND_LABEL: Record<SearchResult["kind"], string> = {
   school: "School",
   shelter: "Relief shelter",
   bridge: "Bridge",
+  place: "Place",
 };
 const KIND_COLOR: Record<SearchResult["kind"], string> = {
   river: "#1a73e8",
@@ -22,8 +24,11 @@ const KIND_COLOR: Record<SearchResult["kind"], string> = {
   school: "#e37400",
   shelter: "#1a73e8",
   bridge: "#5f6368",
+  place: "#ea4335",
 };
 const MAX_RESULTS = 8;
+const MAX_PLACE_RESULTS = 4;
+const PLACE_SEARCH_DEBOUNCE_MS = 450;
 
 function KindIcon({ kind }: { kind: SearchResult["kind"] }) {
   const path =
@@ -37,7 +42,9 @@ function KindIcon({ kind }: { kind: SearchResult["kind"] }) {
             ? "M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5"
             : kind === "shelter"
               ? "M3 11l9-7 9 7M5 10v10h14V10"
-              : "M3 17c3-6 15-6 18 0M3 17h18M7 13v4M12 11v6M17 13v4";
+              : kind === "place"
+                ? "M12 21s-6.5-6.2-6.5-11.5a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
+                : "M3 17c3-6 15-6 18 0M3 17h18M7 13v4M12 11v6M17 13v4";
   return (
     <span
       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
@@ -80,7 +87,7 @@ function useSearchIndex() {
 
 // Rivers and dams first, then facilities by how critical they are in a flood;
 // within a kind, prefix matches beat word matches beat substrings.
-const KIND_RANK: Record<SearchResult["kind"], number> = { river: 0, dam: 0, hospital: 10, shelter: 20, school: 30, bridge: 40 };
+const KIND_RANK: Record<SearchResult["kind"], number> = { river: 0, dam: 0, place: 5, hospital: 10, shelter: 20, school: 30, bridge: 40 };
 
 function rank(entry: SearchResult, q: string): number {
   const name = entry.name.toLowerCase();
@@ -91,14 +98,50 @@ function rank(entry: SearchResult, q: string): number {
   return -1;
 }
 
+// Towns, villages and landmarks from OpenStreetMap, once the query settles.
+function usePlaceSearch(query: string) {
+  const [found, setFound] = useState<{ q: string; results: SearchResult[] }>({ q: "", results: [] });
+  const q = query.trim();
+  useEffect(() => {
+    if (q.length < 3) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .searchPlaces(q)
+        .then((places) => {
+          if (cancelled) return;
+          const results = places.slice(0, MAX_PLACE_RESULTS).map<SearchResult>((p) => ({
+            kind: "place",
+            id: `place-${p.lat},${p.lon}`,
+            name: p.name,
+            detail: p.detail,
+            lon: p.lon,
+            lat: p.lat,
+          }));
+          setFound({ q, results });
+        })
+        .catch(() => {});
+    }, PLACE_SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [q]);
+  return found.q === q ? found.results : [];
+}
+
 export function SearchBox({
   onPick,
   panelOpen,
   onTogglePanel,
+  chatOpen,
+  onAsk,
 }: {
   onPick: (result: SearchResult) => void;
   panelOpen: boolean;
   onTogglePanel: () => void;
+  chatOpen: boolean;
+  onAsk: () => void;
 }) {
   const index = useSearchIndex();
   const [query, setQuery] = useState("");
@@ -106,16 +149,21 @@ export function SearchBox({
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const places = usePlaceSearch(query);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return index
+    const local = index
       .map((e) => [rank(e, q), e] as const)
       .filter(([r]) => r >= 0)
       .sort((a, b) => a[0] - b[0] || a[1].name.localeCompare(b[1].name))
-      .slice(0, MAX_RESULTS)
       .map(([, e]) => e);
-  }, [index, query]);
+    // Rivers and dams first, then places, then facilities.
+    const top = local.filter((e) => e.kind === "river" || e.kind === "dam");
+    const rest = local.filter((e) => e.kind !== "river" && e.kind !== "dam");
+    return [...top, ...places, ...rest].slice(0, MAX_RESULTS);
+  }, [index, query, places]);
 
   const pick = (r: SearchResult) => {
     onPick(r);
@@ -165,7 +213,7 @@ export function SearchBox({
               inputRef.current?.blur();
             }
           }}
-          placeholder="Search rivers, dams, hospitals…"
+          placeholder="Search places, rivers, dams…"
           aria-label="Search VARUNA"
           className="min-w-0 flex-1 bg-transparent text-[15px] text-[#202124] outline-none placeholder:text-[#70757a]"
         />
@@ -187,7 +235,18 @@ export function SearchBox({
             <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14" />
           </svg>
         )}
-        <span className="ml-2 border-l border-black/[0.07] pl-3 text-[13px] font-medium tracking-wide text-[#1a73e8]">VARUNA</span>
+        <span className="ml-1.5 h-6 border-l border-black/[0.07]" />
+        <button
+          onClick={onAsk}
+          aria-pressed={chatOpen}
+          title="Chat with VARUNA about any river, dam or place"
+          className={`ml-1.5 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium tracking-wide transition-colors ${
+            chatOpen ? "bg-[#1a73e8] text-white" : "text-[#1a73e8] hover:bg-[#e8f0fe]"
+          }`}
+        >
+          <SparkleIcon className="h-4 w-4" />
+          Ask VARUNA
+        </button>
       </div>
 
       {open && results.length > 0 && (

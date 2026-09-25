@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCenter } from "../components/AlertCenter";
+import { ChatPanel } from "../components/ChatPanel";
 import { CoastalWidget } from "../components/CoastalWidget";
 import { DamPanel } from "../components/DamPanel";
 import { DataSourceSwitcher } from "../components/DataSourceSwitcher";
@@ -15,13 +16,15 @@ import {
   type MapSelection,
 } from "../components/KeralaMap";
 import { KeralaOverview, type PlaceMeta } from "../components/KeralaOverview";
+import { LocationPanel, type MapPin } from "../components/LocationPanel";
 import { BasemapToggle, LayerChips } from "../components/MapChrome";
 import { RiverPanel } from "../components/RiverPanel";
 import { SearchBox, type SearchResult } from "../components/SearchBox";
-import { api, type ExposedAsset, type LiveSourceStatus, type SimulationSourceStatus } from "../lib/api";
+import { api, type ChatAction, type ExposedAsset, type LiveSourceStatus, type SimulationSourceStatus } from "../lib/api";
 import { useCoastal } from "../lib/useCoastal";
 import { useFloodForecast } from "../lib/useFloodForecast";
 import { useLiveData } from "../lib/useLiveData";
+import { useVarunaChat } from "../lib/useVarunaChat";
 
 // Screen space taken by floating UI (px), so map framing keeps Kerala visible.
 const SIDE_PANEL_W = 408;
@@ -39,13 +42,45 @@ export default function CommandCenter() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [basemap, setBasemap] = useState<Basemap>("map");
   const [layers, setLayers] = useState<LayerToggles>(DEFAULT_LAYERS);
+  const [pin, setPin] = useState<MapPin | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const flyTo = useCallback((lon: number, lat: number, id: string) => setFocus({ lon, lat, key: `${id}-${Date.now()}` }), []);
   const focusAsset = useCallback((a: ExposedAsset) => flyTo(a.lon, a.lat, a.id), [flyTo]);
+  // A river/dam selection and a dropped pin are alternatives: setting one clears the other.
   const select = useCallback((s: MapSelection) => {
     setSelection(s);
-    if (s) setPanelOpen(true);
+    if (s) {
+      setPin(null);
+      setPanelOpen(true);
+    }
   }, []);
+  const dropPin = useCallback((p: Omit<MapPin, "key">) => {
+    setSelection(null);
+    setPin({ ...p, key: `${p.lat.toFixed(5)},${p.lon.toFixed(5)}-${Date.now()}` });
+    setPanelOpen(true);
+  }, []);
+
+  const namePin = useCallback(
+    (key: string, label: string) => setPin((p) => (p && p.key === key && !p.label ? { ...p, label } : p)),
+    []
+  );
+
+  // Ask VARUNA answers with map actions: the last one decides where the map ends up.
+  const applyChatAction = useCallback(
+    (a: ChatAction) => {
+      if (a.type === "select_river") select({ type: "river", id: a.id });
+      else if (a.type === "select_dam") select({ type: "dam", id: a.id });
+      else if (a.type === "pin") dropPin({ lat: a.lat, lon: a.lon, label: a.label, assessment: a.assessment, fly: true });
+      else {
+        setPin(null);
+        setSelection(null);
+      }
+    },
+    [select, dropPin]
+  );
+  const onChatActions = useCallback((actions: ChatAction[]) => applyChatAction(actions[actions.length - 1]), [applyChatAction]);
+  const chat = useVarunaChat(onChatActions);
 
   useEffect(() => {
     api.riversGeoJson().then((fc) => {
@@ -68,10 +103,11 @@ export default function CommandCenter() {
 
   const onSearchPick = useCallback(
     (r: SearchResult) => {
-      if ("lon" in r) flyTo(r.lon, r.lat, r.id);
+      if (r.kind === "place") dropPin({ lat: r.lat, lon: r.lon, label: r.name, fly: true });
+      else if ("lon" in r) flyTo(r.lon, r.lat, r.id);
       else select({ type: r.kind, id: r.id });
     },
-    [select, flyTo]
+    [select, flyTo, dropPin]
   );
 
   const liveStatus = snapshot?.mode === "live" ? (snapshot.source_status as LiveSourceStatus) : null;
@@ -90,6 +126,22 @@ export default function CommandCenter() {
   );
   const leftEdge = panelOpen ? SIDE_PANEL_W + 16 : 16;
 
+  const pinLabel = pin ? (pin.label ?? pin.assessment?.place?.name ?? "the pinned location") : null;
+  const selectedName = selection ? (names[selection.id] ?? selection.id) : null;
+  const askVaruna = useCallback(
+    (question?: string) => {
+      setChatOpen(true);
+      setPanelOpen(true);
+      if (question) {
+        chat.send(question, {
+          pin: pin && { lat: pin.lat, lon: pin.lon, label: pinLabel ?? undefined },
+          selection,
+        });
+      }
+    },
+    [chat, pin, pinLabel, selection]
+  );
+
   return (
     <div className="maps-ui relative h-screen w-screen overflow-hidden bg-[#aadaff]">
       <KeralaMap
@@ -102,9 +154,11 @@ export default function CommandCenter() {
         basemap={basemap}
         layers={layers}
         padding={mapPadding}
+        pin={pin}
         onSelectRiver={(id) => select({ type: "river", id })}
         onSelectDam={(id) => select({ type: "dam", id })}
         onDeselect={() => setSelection(null)}
+        onPickPoint={(lon, lat) => dropPin({ lat, lon, fly: false })}
       />
 
       {/* Left: search bar + side panel (overview or place details) */}
@@ -113,11 +167,44 @@ export default function CommandCenter() {
         style={{ width: SIDE_PANEL_W - 8 }}
       >
         <div className="pointer-events-auto">
-          <SearchBox onPick={onSearchPick} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen((o) => !o)} />
+          <SearchBox
+            onPick={onSearchPick}
+            panelOpen={panelOpen}
+            onTogglePanel={() => setPanelOpen((o) => !o)}
+            chatOpen={chatOpen && panelOpen}
+            onAsk={() => (chatOpen && panelOpen ? setChatOpen(false) : askVaruna())}
+          />
         </div>
         {panelOpen && (
-          <div className="pointer-events-auto min-h-0 flex-1 overflow-y-auto maps-glass-strong varuna-scrollbar">
-            {selection?.type === "river" ? (
+          <div
+            className={`pointer-events-auto min-h-0 flex-1 maps-glass-strong ${chatOpen ? "overflow-hidden" : "overflow-y-auto varuna-scrollbar"}`}
+          >
+            {chatOpen ? (
+              <ChatPanel
+                messages={chat.messages}
+                loading={chat.loading}
+                names={names}
+                pinLabel={pinLabel}
+                selectedName={selectedName}
+                onSend={(text) => askVaruna(text)}
+                onReplay={(a) => {
+                  applyChatAction(a);
+                  if (a.type === "pin") setChatOpen(false);
+                }}
+                onReset={chat.reset}
+                onClose={() => setChatOpen(false)}
+              />
+            ) : pin ? (
+              <LocationPanel
+                pin={pin}
+                refreshKey={flood?.generated_at ?? ""}
+                onClose={() => setPin(null)}
+                onAsk={(q) => askVaruna(q)}
+                onFocus={flyTo}
+                onSelectRiver={(id) => select({ type: "river", id })}
+                onPlaceName={namePin}
+              />
+            ) : selection?.type === "river" ? (
               <RiverPanel
                 riverId={selection.id}
                 reading={snapshot?.rivers?.[selection.id]}

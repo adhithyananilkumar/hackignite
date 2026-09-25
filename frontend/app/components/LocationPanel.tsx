@@ -64,6 +64,7 @@ export function LocationPanel({
   onAsk,
   onFocus,
   onSelectRiver,
+  onPlaceName,
 }: {
   pin: MapPin;
   /** Changes when the data source ticks, so the assessment follows the live forecast. */
@@ -72,6 +73,8 @@ export function LocationPanel({
   onAsk: (question: string) => void;
   onFocus: (lon: number, lat: number, id: string) => void;
   onSelectRiver: (id: string) => void;
+  /** Reports the reverse-geocoded name of an unlabelled (click-dropped) pin. */
+  onPlaceName: (pinKey: string, name: string) => void;
 }) {
   const [fetched, setFetched] = useState<{ key: string; data: PointAssessment | null; error: boolean } | null>(null);
   const fetchKey = `${pin.key}|${refreshKey}`;
@@ -93,6 +96,11 @@ export function LocationPanel({
   const assessment = (samePin ? fetched?.data : null) ?? pin.assessment ?? null;
   const failed = samePin && fetched?.error && !assessment;
   const title = pinTitle(pin, assessment);
+  const placeName = assessment?.place?.name;
+
+  useEffect(() => {
+    if (placeName && !pin.label) onPlaceName(pin.key, placeName);
+  }, [placeName, pin.label, pin.key, onPlaceName]);
   const lk = assessment?.likelihood;
   const colors = LIKELIHOOD_COLORS[lk?.level ?? "Very low"];
 
