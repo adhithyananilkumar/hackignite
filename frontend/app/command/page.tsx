@@ -1,26 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AIAssistant } from "../components/AIAssistant";
 import { AlertCenter } from "../components/AlertCenter";
 import { DamPanel } from "../components/DamPanel";
 import { DataHealthPanel } from "../components/DataHealthPanel";
+import { DataSourceSwitcher } from "../components/DataSourceSwitcher";
+import { FloodTimeline } from "../components/FloodTimeline";
 import { GlassPanel } from "../components/glass/GlassPanel";
-import { KeralaMap } from "../components/KeralaMap";
+import { KeralaMap, type MapFocus, type MapSelection } from "../components/KeralaMap";
 import { RiverPanel } from "../components/RiverPanel";
-import { api } from "../lib/api";
+import { api, type ExposedAsset, type LiveSourceStatus } from "../lib/api";
+import { useFloodForecast } from "../lib/useFloodForecast";
 import { useLiveData } from "../lib/useLiveData";
-
-type Selection = { type: "river" | "dam"; id: string } | null;
 
 const RISK_ORDER = ["NORMAL", "WATCH", "ADVISORY", "HIGH", "CRITICAL"];
 
 export default function CommandCenter() {
   const { snapshot, connected } = useLiveData();
+  const flood = useFloodForecast(snapshot?.mode);
   const [riverNames, setRiverNames] = useState<Record<string, string>>({});
   const [damNames, setDamNames] = useState<Record<string, string>>({});
-  const [selection, setSelection] = useState<Selection>(null);
+  const [selection, setSelection] = useState<MapSelection>(null);
+  const [horizonIndex, setHorizonIndex] = useState(0);
+  const [focus, setFocus] = useState<MapFocus>(null);
+  const focusAsset = useCallback(
+    (a: ExposedAsset) => setFocus({ lon: a.lon, lat: a.lat, key: `${a.id}-${Date.now()}` }),
+    []
+  );
 
   useEffect(() => {
     api.riversGeoJson().then((fc) => {
@@ -34,6 +42,9 @@ export default function CommandCenter() {
       setDamNames(map);
     });
   }, []);
+
+  const liveStatus = snapshot?.mode === "live" ? (snapshot.source_status as LiveSourceStatus) : null;
+  const healthKey = `${snapshot?.mode}:${liveStatus?.state ?? ""}:${liveStatus?.last_updated ?? ""}`;
 
   const rivers = snapshot ? Object.values(snapshot.rivers) : [];
   const dams = snapshot ? Object.values(snapshot.dams) : [];
@@ -51,6 +62,9 @@ export default function CommandCenter() {
       <KeralaMap
         snapshot={snapshot}
         selection={selection}
+        flood={flood}
+        horizonIndex={horizonIndex}
+        focus={focus}
         onSelectRiver={(id) => setSelection({ type: "river", id })}
         onSelectDam={(id) => setSelection({ type: "dam", id })}
         onDeselect={() => setSelection(null)}
@@ -66,13 +80,14 @@ export default function CommandCenter() {
           </Link>
           <span className="text-[var(--glass-text-dim)] text-xs">Kerala Flood Intelligence</span>
         </GlassPanel>
+        <DataSourceSwitcher snapshot={snapshot} />
         <GlassPanel strong className="pointer-events-auto flex items-center gap-3 py-2.5">
           <span className={`text-xs font-semibold risk-text-${worstRisk}`}>
             <span className={`risk-dot risk-${worstRisk} mr-1.5`} />
             {worstRisk}
           </span>
-          <span className="text-xs text-[var(--glass-text-dim)]">
-            {connected ? "LIVE ●" : "reconnecting…"}
+          <span className="text-xs text-[var(--glass-text-dim)]" title="Streaming connection to the VARUNA backend">
+            {connected ? "● Connected" : "Reconnecting…"}
           </span>
         </GlassPanel>
       </div>
@@ -115,13 +130,18 @@ export default function CommandCenter() {
           </div>
         </GlassPanel>
 
-        <DataHealthPanel />
+        <DataHealthPanel refreshKey={healthKey} />
       </div>
 
       {/* Right column: alerts + AI */}
       <div className="absolute top-24 right-4 z-10 flex flex-col gap-4">
         <AlertCenter />
         <AIAssistant />
+      </div>
+
+      {/* Flood forecast timeline */}
+      <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
+        <FloodTimeline forecast={flood} horizonIndex={horizonIndex} onHorizonChange={setHorizonIndex} />
       </div>
 
       {/* Detail panel */}
@@ -132,6 +152,10 @@ export default function CommandCenter() {
               riverId={selection.id}
               reading={snapshot?.rivers?.[selection.id]}
               name={riverNames[selection.id] ?? selection.id}
+              flood={flood?.rivers.find((r) => r.river_id === selection.id)}
+              horizonIndex={horizonIndex}
+              onHorizonChange={setHorizonIndex}
+              onFocusAsset={focusAsset}
               onClose={() => setSelection(null)}
             />
           ) : (

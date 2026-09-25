@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { API_BASE, type DamReading, type RiverReading } from "./api";
+import {
+  API_BASE,
+  type DamReading,
+  type LiveSourceStatus,
+  type RiverReading,
+  type SimulationSourceStatus,
+  type SourceMode,
+} from "./api";
 
 export interface LiveSnapshot {
+  mode: SourceMode;
   rivers: Record<string, RiverReading>;
   dams: Record<string, DamReading>;
-  progress: number;
+  source_status: LiveSourceStatus | SimulationSourceStatus;
 }
 
 export function useLiveData() {

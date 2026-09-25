@@ -1,0 +1,19 @@
+{
+  "id": "kerala_2018",
+  "name": "Statewide extreme (2018-style)",
+  "description": "Every modelled river exceeds danger level within three days, with major reservoirs near full — a stress test of the whole pipeline.",
+  "duration_s": 240,
+  "represents_hours": 72,
+  "rivers": {
+    "*":          { "peak_above_danger_m": 1.0, "onset": 0.10, "peak_at": 0.75, "recession_m_per_hr": 0.04 },
+    "periyar":    { "peak_above_danger_m": 1.8, "onset": 0.05, "peak_at": 0.70, "recession_m_per_hr": 0.04 },
+    "pamba":      { "peak_above_danger_m": 2.0, "onset": 0.05, "peak_at": 0.72, "recession_m_per_hr": 0.03 },
+    "chalakudy":  { "peak_above_danger_m": 1.6, "onset": 0.08, "peak_at": 0.70, "recession_m_per_hr": 0.05 }
+  },
+  "dams": {
+    "idukki":         { "storage_start_pct": 80, "storage_peak_pct": 99, "inflow_base": 600, "inflow_peak": 2400, "outflow_base": 500 },
+    "mullaperiyar":   { "storage_start_pct": 78, "storage_peak_pct": 98, "inflow_base": 200, "inflow_peak": 900, "outflow_base": 180 },
+    "banasura_sagar": { "storage_start_pct": 70, "storage_peak_pct": 96, "inflow_base": 90, "inflow_peak": 420, "outflow_base": 80 },
+    "malampuzha":     { "storage_start_pct": 65, "storage_peak_pct": 94, "inflow_base": 70, "inflow_peak": 330, "outflow_base": 60 }
+  }
+}

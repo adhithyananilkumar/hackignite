@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from models import Alert, RiskLevel
-from services.simulator import simulator
+from services.sources.hub import hub
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -21,7 +21,7 @@ def _active_alerts() -> list[Alert]:
     alerts: list[Alert] = []
     now = datetime.now(UTC).isoformat()
 
-    for reading in simulator.list_rivers():
+    for reading in hub.list_rivers():
         if reading.risk == RiskLevel.NORMAL:
             continue
         alert_id = f"river-{reading.river_id}"
@@ -35,7 +35,7 @@ def _active_alerts() -> list[Alert]:
             acknowledged=alert_id in _acknowledged,
         ))
 
-    for reading in simulator.list_dams():
+    for reading in hub.list_dams():
         if reading.risk == RiskLevel.NORMAL:
             continue
         alert_id = f"dam-{reading.dam_id}"

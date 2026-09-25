@@ -19,3 +19,9 @@ env/
 
 # Raw OpenStreetMap dumps used to build data/*.geojson (see _raw_osm/process.py)
 _raw_osm/*.json
+
+# DEM tile cache for scripts/build_flood_grids.py
+_raw_dem/
+
+# Runtime caches (GloFAS gauge calibration)
+.cache/
